@@ -1,3 +1,0 @@
-Synthetic data generated with 50 rows and 3 columns.
-Schema hint: {'rows': 50, 'columns': [{'name': 'age', 'type': 'int', 'range': [18, 65]}, {'name': 'income', 'type': 'float', 'range': [30000, 150000]}, {'name': 'gender', 'type': 'binary', 'imbalance_ratio': 0.5}]}
-Method: random_numpy
