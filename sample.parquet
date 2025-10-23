@@ -1,0 +1,11 @@
+import pandas as pd
+import numpy as np
+
+df = pd.DataFrame({
+    "age": np.random.randint(18, 70, 100),
+    "income": np.random.randint(20000, 100000, 100),
+    "gender": np.random.choice(["M", "F"], 100),
+    "default_flag": np.random.choice([0, 1], 100, p=[0.7, 0.3])
+})
+
+df.to_parquet("sample.parquet")
