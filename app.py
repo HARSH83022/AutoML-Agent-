@@ -412,73 +412,6 @@
 
 
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Body, Query
-from pydantic import BaseModel
-from typing import List, Dict, Optional, Union, Any
-import pandas as pd
-import io
-import os
-
-# -----------------------------
-# Import agent functions safely
-# -----------------------------
-try:
-    from preprocessing_agent import preprocess
-    from model_selection_agent import model_selection
-    from training_agent import train_model_agent
-    from evaluation_agent import evaluate_model
-    from report_agent import generate_report
-except ModuleNotFoundError as e:
-    preprocess = model_selection = train_model_agent = evaluate_model = generate_report = None
-    print(f"⚠️ Agent import error: {e}")
-
-# -----------------------------
-# Initialize FastAPI
-# -----------------------------
-app = FastAPI(title="🚀 Multi-Agent ML Pipeline API")
-
-# -----------------------------
-# Root Endpoint
-# -----------------------------
-@app.get("/")
-def root():
-    return {"message": "✅ Multi-Agent ML Pipeline API is running successfully!"}
-
-# -----------------------------
-# Request Models
-# -----------------------------
-class DataItem(BaseModel):
-    features: Dict[str, Optional[Union[str, float, int, bool, None]]]
-
-class PreprocessingRequest(BaseModel):
-    data: List[DataItem]
-
-# -----------------------------
-# Preprocessing Endpoints
-# -----------------------------
-# @app.post("/run_preprocessing/json")
-# def run_preprocessing_json(request: PreprocessingRequest, save_csv: Optional[bool] = Query(True)):
-#     if preprocess is None:
-#         raise HTTPException(status_code=500, detail="❌ Preprocessing module not found")
-
-#     save_csv = bool(str(save_csv).lower() == "true")
-
-#     try:
-#         # Convert incoming data to DataFrame
-#         df = pd.DataFrame([item.features for item in request.data])
-
-#         # Replace None (null) with NaN
-#         df = df.where(pd.notnull(df), None)
-
-#         # Call your preprocessing function
-#         result = preprocess(df, save_artifacts=save_csv)
-
-#         return {"status": "✅ Preprocessing successful", "result": result}
-
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"Error in preprocessing: {str(e)}")
-
-
 from fastapi import BackgroundTasks, HTTPException, Query
 from typing import Optional
 import pandas as pd
@@ -618,19 +551,27 @@ def run_model_selection(data: Dict[str, Any] = Body(...)):
 # Model Training Endpoint
 # -----------------------------
 @app.post("/model_training")
-def run_model_training(data: Dict[str, Any] = Body(...)):
-    if train_model_agent is None:
-        raise HTTPException(status_code=500, detail="❌ Training module not found")
+async def model_training(payload: dict):
     try:
-        df = pd.DataFrame(data["df"]) if isinstance(data["df"], list) else data["df"]
-        target = data.get("target")
-        model_type = data.get("model_type", "auto")
+        processed_csv_path = payload.get("processed_csv_path")
+        target_column = payload.get("target_column")
+        model_name = payload.get("model_name", "auto")
 
-        result = train_model_agent(df, target=target, model_type=model_type)
-        return {"status": "✅ Model trained successfully", "result": result}
+        if not processed_csv_path or not target_column:
+            return {"error": "processed_csv_path and target_column are required"}
+
+        df = pd.read_csv(processed_csv_path)
+
+        result = train_model_agent(
+            df=df,
+            target=target_column,
+            model_type=model_name
+        )
+
+        return {"status": "✅ Model Training Completed", "result": result}
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error in model training: {str(e)}")
+        return {"detail": f"Error in model training: {e}"}
 
 # -----------------------------
 # Evaluation Endpoint
