@@ -1,0 +1,17 @@
+{
+    "run_id": "uuid",
+    "dataset_uri": "sample.parquet",
+    "task_type": "classification",
+    "target": "default_flag",
+    "strategies": {
+        "missing": "median_mode",
+        "categorical_encoding": "target_or_onehot",
+        "scaling": "standard",
+        "imbalance": "smote",
+        "split": {
+            "stratified": true,
+            "test_size": 0.2,
+            "cv_folds": 5
+        }
+    }
+}
