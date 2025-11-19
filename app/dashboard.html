@@ -1,0 +1,318 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>AutoML Orchestrator — Dashboard</title>
+
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      margin: 18px;
+      background: #f6f8fb;
+      color: #0b1220;
+    }
+    .wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 14px;
+      box-shadow: 0 8px 24px rgba(12,24,40,0.06);
+    }
+    textarea, input {
+      width: 100%;
+      padding: 8px;
+      margin-top: 6px;
+      border: 1px solid #e6e9ef;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    button {
+      padding: 8px 12px;
+      background: #0ea5a7;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 6px;
+    }
+    button:hover {
+      background: #0c8c8d;
+    }
+    .muted {
+      color: #6b7280;
+      font-size: 13px;
+    }
+    .log {
+      font-family: monospace;
+      background: #0b1220;
+      color: #e6eef6;
+      padding: 10px;
+      border-radius: 6px;
+      white-space: pre-wrap;
+      max-height: 350px;
+      overflow-y: auto;
+    }
+    .small { font-size: 13px; }
+  </style>
+</head>
+
+<body>
+
+<div class="wrap">
+  <h2>AutoML Orchestrator — Interactive Dashboard</h2>
+
+  <!-- Step 1: Dataset -->
+  <div class="card">
+    <h3>Step 1 — Dataset</h3>
+    <div class="muted">Provide a local CSV file path or public CSV URL.  
+    Leave empty to let the Data Agent search or synthesize automatically.</div>
+    <input id="upload_path" placeholder="Local path or public URL (optional)"/>
+  </div>
+
+
+  <!-- Step 2: Hint / Topic -->
+  <div class="card">
+    <h3>Step 2 — Problem Topic / Hint</h3>
+    <div class="muted">Provide a topic such as: loan default, customer churn, diabetes detection, sales forecasting, etc.</div>
+    <input id="ps_hint" placeholder="e.g., churn prediction, diabetes detection, loan default"/>
+  </div>
+
+
+  <!-- Step 3: PS Input -->
+  <div class="card">
+    <h3>Step 3 — Problem Statement</h3>
+
+    <div class="muted">Do you already have a complete problem statement?</div>
+
+    <button onclick="chooseHavePS(true)">Yes — I have one</button>
+    <button onclick="chooseHavePS(false)" style="margin-left: 8px;">No — Generate options</button>
+
+    <div id="psArea" style="display:none; margin-top:12px;">
+      
+      <div id="havePSBlock">
+        <label>Paste your Problem Statement:</label>
+        <textarea id="user_ps" placeholder="Paste your full PS here..."></textarea>
+        <button onclick="callPS(true)">Parse & Refine</button>
+      </div>
+
+      <div id="noPSBlock" style="display:none">
+        <div class="muted">
+          The LLM will generate 2–3 problem statement options based on your topic/hint above.
+        </div>
+        <button onclick="callPS(false)">Generate Problem Statements</button>
+      </div>
+
+    </div>
+  </div>
+
+
+  <!-- Step 4: PS Results -->
+  <div id="psResults" class="card" style="display:none">
+    <h3>Generated / Parsed Problem Statements</h3>
+
+    <div id="psOptions"></div>
+
+    <div style="margin-top:10px;">
+      <label>Edit / Confirm Selected Problem Statement</label>
+      <textarea id="selected_ps"></textarea>
+      <button onclick="startRun()">Start AutoML Run</button>
+    </div>
+  </div>
+
+
+  <!-- Step 5: Run Status -->
+  <div id="runCard" class="card" style="display:none">
+    <h3>Run Status</h3>
+
+    <label>Run ID</label>
+    <input id="runid" readonly/>
+
+    <label>Status</label>
+    <div id="status" class="small muted">—</div>
+
+    <label>Phase</label>
+    <div id="phase" class="small muted">—</div>
+
+    <label>Last Error</label>
+    <div id="lasterr" class="small muted">—</div>
+
+    <label>Logs</label>
+    <div id="log" class="log">—</div>
+
+    <label>Artifacts</label>
+    <ul id="artifacts"></ul>
+  </div>
+
+</div>
+
+
+
+<script>
+let storedOptions = [];
+
+
+function chooseHavePS(v){
+  document.getElementById("psArea").style.display = "block";
+  document.getElementById("havePSBlock").style.display = v ? "block" : "none";
+  document.getElementById("noPSBlock").style.display = v ? "none" : "block";
+  document.getElementById("psResults").style.display = "none";
+}
+
+
+async function callPS(have_ps){
+  const psText = document.getElementById("user_ps").value.trim();
+  const hint = document.getElementById("ps_hint").value.trim();
+
+  if(!have_ps && !hint){
+    alert("Please enter a topic/hint first.");
+    return;
+  }
+
+  const payload = {
+    have_ps: have_ps,
+    problem_statement: psText,
+    hint: hint,
+    preferences: {}
+  };
+
+  const res = await fetch("/ps", {
+    method:"POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify(payload)
+  });
+
+  const j = await res.json();
+  const container = document.getElementById("psOptions");
+  container.innerHTML = "";
+
+  if(j.status !== "ok"){
+    alert("Error: " + j.error);
+    return;
+  }
+
+  // If parsed PS
+  if(j.mode === "parsed" && j.ps_parsed){
+    const text = j.ps_parsed.raw_text || JSON.stringify(j.ps_parsed, null, 2);
+    container.innerHTML = `<pre>${escapeHtml(text)}</pre>`;
+    document.getElementById("selected_ps").value = text;
+    document.getElementById("psResults").style.display = "block";
+    return;
+  }
+
+  // If generated options
+  storedOptions = j.ps_options || [];
+  let html = "<b>Generated Options</b>";
+
+  storedOptions.forEach((opt, idx) => {
+    const text = opt.statement || opt.raw_text || JSON.stringify(opt);
+    html += `
+      <div style="margin-top:10px; padding:10px; border:1px solid #ccc; border-radius:6px;">
+        <b>Option ${idx+1}</b>
+        <pre>${escapeHtml(text)}</pre>
+        <button onclick="chooseOption(${idx})">Choose this</button>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+
+  if(storedOptions.length > 0){
+    document.getElementById("selected_ps").value =
+      storedOptions[0].statement || storedOptions[0].raw_text || "";
+  }
+
+  document.getElementById("psResults").style.display = "block";
+}
+
+
+function chooseOption(idx){
+  const opt = storedOptions[idx];
+  if(opt){
+    document.getElementById("selected_ps").value =
+      opt.statement || opt.raw_text || JSON.stringify(opt);
+  }
+}
+
+
+async function startRun(){
+  const ps = document.getElementById("selected_ps").value.trim();
+  const dataset = document.getElementById("upload_path").value.trim();
+
+  if(!ps){
+    alert("Please confirm your problem statement.");
+    return;
+  }
+
+  const payload = {
+    user: dataset ? { upload_path: dataset } : {},
+    mode: "ps_provided",
+    problem_statement: ps,
+    preferences: {
+      primary_metric: "f1",
+      training_budget_minutes: 2,
+      allow_synthetic: true
+    }
+  };
+
+  const res = await fetch("/run", {
+    method:"POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify(payload)
+  });
+
+  const j = await res.json();
+  document.getElementById("runCard").style.display = "block";
+  document.getElementById("runid").value = j.run_id;
+  
+  startPoll(j.run_id);
+}
+
+
+let poller = null;
+
+async function startPoll(run_id){
+  if(poller) clearInterval(poller);
+  await fetchOnce(run_id);
+  poller = setInterval(() => fetchOnce(run_id), 3000);
+}
+
+
+async function fetchOnce(run_id){
+  try {
+    const res = await fetch(`/status/${run_id}`);
+    if(!res.ok) return;
+
+    const j = await res.json();
+
+    document.getElementById("status").innerText = j.status || "-";
+    document.getElementById("phase").innerText = j.state?.phase || "-";
+    document.getElementById("lasterr").innerText = j.last_error || "-";
+    document.getElementById("log").innerText = j.log_tail || "-";
+
+    const ul = document.getElementById("artifacts");
+    ul.innerHTML = "";
+
+    (j.artifacts || []).forEach(a => {
+      const li = document.createElement("li");
+      li.innerHTML = `<a href="${a}" target="_blank">${a}</a>`;
+      ul.appendChild(li);
+    });
+
+  } catch {}
+}
+
+
+function escapeHtml(str){
+  return str.replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+}
+
+</script>
+
+</body>
+</html>

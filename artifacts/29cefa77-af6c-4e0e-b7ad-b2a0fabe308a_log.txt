@@ -1,0 +1,48 @@
+[2025-11-05 12:40:02] Received run: {'run_id': None, 'user': {}, 'mode': 'ps_provided', 'problem_statement': 'Predict loan default from transactional history', 'preferences': {'primary_metric': 'f1', 'training_budget_minutes': 2, 'allow_synthetic': True, 'deploy': False}}
+[2025-11-05 12:59:34] Orchestration started
+[2025-11-05 12:59:34] START ps_agent attempt=1
+[2025-11-05 13:02:12] OK ps_agent
+[2025-11-05 13:02:12] PS: {'task_type': 'classification', 'domain': 'general', 'target': None, 'entities': [], 'keywords': ['loan', 'default', 'transaction'], 'constraints': {'primary_metric': 'f1', 'training_budget_minutes': 2, 'allow_synthetic': True, 'deploy': False}, 'plan': {'required_modalities': ['tabular'], 'candidate_models': ['xgboost', 'lightgbm', 'logreg'], 'metrics': ['f1', 'roc_auc']}, 'raw_text': 'Predict lo
+[2025-11-05 13:02:12] START data_agent attempt=1
+[2025-11-05 13:09:03] OK data_agent
+[2025-11-05 13:09:03] Dataset: data/29cefa77-af6c-4e0e-b7ad-b2a0fabe308a_synthetic.csv
+[2025-11-05 13:09:03] START prep_agent attempt=1
+[2025-11-05 13:09:03] OK prep_agent
+[2025-11-05 13:09:03] Prep: {'train_path': 'artifacts/29cefa77-af6c-4e0e-b7ad-b2a0fabe308a_train.npz', 'test_path': 'artifacts/29cefa77-af6c-4e0e-b7ad-b2a0fabe308a_test.npz', 'transformer_path': 'artifacts/29cefa77-af6c-4e0e-b7a
+[2025-11-05 13:09:03] START automl_agent attempt=1
+[2025-11-05 13:09:05] ERROR automl_agent attempt=1: 'list' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 76, in safe_step
+    res = step_fn(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\agents\automl_agent.py", line 21, in run_automl
+    candidate_models = plan.get("candidate_models", ["xgboost","random_forest","logistic_regression"])
+                       ^^^^^^^^
+AttributeError: 'list' object has no attribute 'get'
+
+[2025-11-05 13:09:07] START automl_agent attempt=2
+[2025-11-05 13:09:08] ERROR automl_agent attempt=2: 'list' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 76, in safe_step
+    res = step_fn(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\agents\automl_agent.py", line 21, in run_automl
+    candidate_models = plan.get("candidate_models", ["xgboost","random_forest","logistic_regression"])
+                       ^^^^^^^^
+AttributeError: 'list' object has no attribute 'get'
+
+[2025-11-05 13:09:12] Run FAILED: 'list' object has no attribute 'get'
+Traceback (most recent call last):
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 102, in orchestrate_run
+    train_res = safe_step(run_automl, run_id, prep_res["train_path"], ps, payload.get("preferences",{}), run_id=run_id, step_name="automl_agent")
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 84, in safe_step
+    raise last_exc
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 76, in safe_step
+    res = step_fn(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\agents\automl_agent.py", line 21, in run_automl
+    candidate_models = plan.get("candidate_models", ["xgboost","random_forest","logistic_regression"])
+                       ^^^^^^^^
+AttributeError: 'list' object has no attribute 'get'
+

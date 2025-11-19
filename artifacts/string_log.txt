@@ -1,0 +1,120 @@
+[2025-11-05 12:35:50] Received run: {'run_id': 'string', 'user': {}, 'mode': 'ps_provided', 'problem_statement': 'string', 'preferences': {}}
+[2025-11-05 12:35:50] Orchestration started
+[2025-11-05 12:35:50] START ps_agent attempt=1
+[2025-11-05 12:36:26] OK ps_agent
+[2025-11-05 12:36:26] PS: {'task_type': 'classification', 'domain': 'general', 'target': None, 'entities': [], 'keywords': [], 'constraints': {}, 'plan': {'required_modalities': ['tabular'], 'candidate_models': ['xgboost', 'lightgbm', 'logreg'], 'metrics': ['f1', 'roc_auc']}, 'raw_text': 'string'}
+[2025-11-05 12:36:26] START data_agent attempt=1
+[2025-11-05 12:38:28] Received run: {'run_id': 'string', 'user': {}, 'mode': 'ps_provided', 'problem_statement': 'string', 'preferences': {}}
+[2025-11-05 12:38:28] Orchestration started
+[2025-11-05 12:38:28] START ps_agent attempt=1
+[2025-11-05 12:38:50] OK ps_agent
+[2025-11-05 12:38:50] PS: {'task_type': 'classification', 'domain': 'general', 'target': None, 'entities': [], 'keywords': [], 'constraints': {}, 'plan': {'required_modalities': ['tabular'], 'candidate_models': ['xgboost', 'lightgbm', 'logreg'], 'metrics': ['f1', 'roc_auc']}, 'raw_text': 'string'}
+[2025-11-05 12:38:50] START data_agent attempt=1
+[2025-11-05 12:59:06] OK data_agent
+[2025-11-05 12:59:06] Dataset: data/string_synthetic.csv
+[2025-11-05 12:59:06] START prep_agent attempt=1
+[2025-11-05 12:59:06] OK prep_agent
+[2025-11-05 12:59:06] Prep: {'train_path': 'artifacts/string_train.npz', 'test_path': 'artifacts/string_test.npz', 'transformer_path': 'artifacts/string_transformer.joblib', 'report': 'artifacts/string_prep_report.json', 'summar
+[2025-11-05 12:59:06] START automl_agent attempt=1
+[2025-11-05 12:59:16] ERROR automl_agent attempt=1: lr is not a built-in learner for this task type, only ['xgboost', 'xgb_limitdepth', 'rf', 'lgbm', 'lgbm_spark', 'rf_spark', 'lrl1', 'lrl2', 'catboost', 'extra_tree', 'kneighbor', 'transformer', 'transformer_ms', 'histgb', 'svc', 'sgd', 'nb_spark', 'enet', 'lassolars', 'glr_spark', 'lr_spark', 'svc_spark', 'gbt_spark', 'aft_spark'] are supported.Please use AutoML.add_learner() to add a customized learner.
+Traceback (most recent call last):
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 76, in safe_step
+    res = step_fn(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\agents\automl_agent.py", line 38, in run_automl
+    automl.fit(X_train=X_train, y_train=y_train, **automl_settings)
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\automl.py", line 1913, in fit
+    self._state.task.estimator_class_from_str(estimator_name),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\task\task.py", line 345, in estimator_class_from_str
+    raise ValueError(
+ValueError: lr is not a built-in learner for this task type, only ['xgboost', 'xgb_limitdepth', 'rf', 'lgbm', 'lgbm_spark', 'rf_spark', 'lrl1', 'lrl2', 'catboost', 'extra_tree', 'kneighbor', 'transformer', 'transformer_ms', 'histgb', 'svc', 'sgd', 'nb_spark', 'enet', 'lassolars', 'glr_spark', 'lr_spark', 'svc_spark', 'gbt_spark', 'aft_spark'] are supported.Please use AutoML.add_learner() to add a customized learner.
+
+[2025-11-05 12:59:18] START automl_agent attempt=2
+[2025-11-05 12:59:30] ERROR automl_agent attempt=2: lr is not a built-in learner for this task type, only ['xgboost', 'xgb_limitdepth', 'rf', 'lgbm', 'lgbm_spark', 'rf_spark', 'lrl1', 'lrl2', 'catboost', 'extra_tree', 'kneighbor', 'transformer', 'transformer_ms', 'histgb', 'svc', 'sgd', 'nb_spark', 'enet', 'lassolars', 'glr_spark', 'lr_spark', 'svc_spark', 'gbt_spark', 'aft_spark'] are supported.Please use AutoML.add_learner() to add a customized learner.
+Traceback (most recent call last):
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 76, in safe_step
+    res = step_fn(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\agents\automl_agent.py", line 38, in run_automl
+    automl.fit(X_train=X_train, y_train=y_train, **automl_settings)
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\automl.py", line 1913, in fit
+    self._state.task.estimator_class_from_str(estimator_name),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\task\task.py", line 345, in estimator_class_from_str
+    raise ValueError(
+ValueError: lr is not a built-in learner for this task type, only ['xgboost', 'xgb_limitdepth', 'rf', 'lgbm', 'lgbm_spark', 'rf_spark', 'lrl1', 'lrl2', 'catboost', 'extra_tree', 'kneighbor', 'transformer', 'transformer_ms', 'histgb', 'svc', 'sgd', 'nb_spark', 'enet', 'lassolars', 'glr_spark', 'lr_spark', 'svc_spark', 'gbt_spark', 'aft_spark'] are supported.Please use AutoML.add_learner() to add a customized learner.
+
+[2025-11-05 12:59:34] Run FAILED: lr is not a built-in learner for this task type, only ['xgboost', 'xgb_limitdepth', 'rf', 'lgbm', 'lgbm_spark', 'rf_spark', 'lrl1', 'lrl2', 'catboost', 'extra_tree', 'kneighbor', 'transformer', 'transformer_ms', 'histgb', 'svc', 'sgd', 'nb_spark', 'enet', 'lassolars', 'glr_spark', 'lr_spark', 'svc_spark', 'gbt_spark', 'aft_spark'] are supported.Please use AutoML.add_learner() to add a customized learner.
+Traceback (most recent call last):
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 102, in orchestrate_run
+    train_res = safe_step(run_automl, run_id, prep_res["train_path"], ps, payload.get("preferences",{}), run_id=run_id, step_name="automl_agent")
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 84, in safe_step
+    raise last_exc
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 76, in safe_step
+    res = step_fn(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\agents\automl_agent.py", line 38, in run_automl
+    automl.fit(X_train=X_train, y_train=y_train, **automl_settings)
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\automl.py", line 1913, in fit
+    self._state.task.estimator_class_from_str(estimator_name),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\task\task.py", line 345, in estimator_class_from_str
+    raise ValueError(
+ValueError: lr is not a built-in learner for this task type, only ['xgboost', 'xgb_limitdepth', 'rf', 'lgbm', 'lgbm_spark', 'rf_spark', 'lrl1', 'lrl2', 'catboost', 'extra_tree', 'kneighbor', 'transformer', 'transformer_ms', 'histgb', 'svc', 'sgd', 'nb_spark', 'enet', 'lassolars', 'glr_spark', 'lr_spark', 'svc_spark', 'gbt_spark', 'aft_spark'] are supported.Please use AutoML.add_learner() to add a customized learner.
+
+[2025-11-05 13:02:33] OK data_agent
+[2025-11-05 13:02:33] Dataset: data/string_synthetic.csv
+[2025-11-05 13:02:33] START prep_agent attempt=1
+[2025-11-05 13:02:34] OK prep_agent
+[2025-11-05 13:02:34] Prep: {'train_path': 'artifacts/string_train.npz', 'test_path': 'artifacts/string_test.npz', 'transformer_path': 'artifacts/string_transformer.joblib', 'report': 'artifacts/string_prep_report.json', 'summar
+[2025-11-05 13:02:34] START automl_agent attempt=1
+[2025-11-05 13:02:51] ERROR automl_agent attempt=1: lr is not a built-in learner for this task type, only ['xgboost', 'xgb_limitdepth', 'rf', 'lgbm', 'lgbm_spark', 'rf_spark', 'lrl1', 'lrl2', 'catboost', 'extra_tree', 'kneighbor', 'transformer', 'transformer_ms', 'histgb', 'svc', 'sgd', 'nb_spark', 'enet', 'lassolars', 'glr_spark', 'lr_spark', 'svc_spark', 'gbt_spark', 'aft_spark'] are supported.Please use AutoML.add_learner() to add a customized learner.
+Traceback (most recent call last):
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 76, in safe_step
+    res = step_fn(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\agents\automl_agent.py", line 38, in run_automl
+    automl.fit(X_train=X_train, y_train=y_train, **automl_settings)
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\automl.py", line 1913, in fit
+    self._state.task.estimator_class_from_str(estimator_name),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\task\task.py", line 345, in estimator_class_from_str
+    raise ValueError(
+ValueError: lr is not a built-in learner for this task type, only ['xgboost', 'xgb_limitdepth', 'rf', 'lgbm', 'lgbm_spark', 'rf_spark', 'lrl1', 'lrl2', 'catboost', 'extra_tree', 'kneighbor', 'transformer', 'transformer_ms', 'histgb', 'svc', 'sgd', 'nb_spark', 'enet', 'lassolars', 'glr_spark', 'lr_spark', 'svc_spark', 'gbt_spark', 'aft_spark'] are supported.Please use AutoML.add_learner() to add a customized learner.
+
+[2025-11-05 13:02:53] START automl_agent attempt=2
+[2025-11-05 13:03:16] ERROR automl_agent attempt=2: lr is not a built-in learner for this task type, only ['xgboost', 'xgb_limitdepth', 'rf', 'lgbm', 'lgbm_spark', 'rf_spark', 'lrl1', 'lrl2', 'catboost', 'extra_tree', 'kneighbor', 'transformer', 'transformer_ms', 'histgb', 'svc', 'sgd', 'nb_spark', 'enet', 'lassolars', 'glr_spark', 'lr_spark', 'svc_spark', 'gbt_spark', 'aft_spark'] are supported.Please use AutoML.add_learner() to add a customized learner.
+Traceback (most recent call last):
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 76, in safe_step
+    res = step_fn(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\agents\automl_agent.py", line 38, in run_automl
+    automl.fit(X_train=X_train, y_train=y_train, **automl_settings)
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\automl.py", line 1913, in fit
+    self._state.task.estimator_class_from_str(estimator_name),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\task\task.py", line 345, in estimator_class_from_str
+    raise ValueError(
+ValueError: lr is not a built-in learner for this task type, only ['xgboost', 'xgb_limitdepth', 'rf', 'lgbm', 'lgbm_spark', 'rf_spark', 'lrl1', 'lrl2', 'catboost', 'extra_tree', 'kneighbor', 'transformer', 'transformer_ms', 'histgb', 'svc', 'sgd', 'nb_spark', 'enet', 'lassolars', 'glr_spark', 'lr_spark', 'svc_spark', 'gbt_spark', 'aft_spark'] are supported.Please use AutoML.add_learner() to add a customized learner.
+
+[2025-11-05 13:03:20] Run FAILED: lr is not a built-in learner for this task type, only ['xgboost', 'xgb_limitdepth', 'rf', 'lgbm', 'lgbm_spark', 'rf_spark', 'lrl1', 'lrl2', 'catboost', 'extra_tree', 'kneighbor', 'transformer', 'transformer_ms', 'histgb', 'svc', 'sgd', 'nb_spark', 'enet', 'lassolars', 'glr_spark', 'lr_spark', 'svc_spark', 'gbt_spark', 'aft_spark'] are supported.Please use AutoML.add_learner() to add a customized learner.
+Traceback (most recent call last):
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 102, in orchestrate_run
+    train_res = safe_step(run_automl, run_id, prep_res["train_path"], ps, payload.get("preferences",{}), run_id=run_id, step_name="automl_agent")
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 84, in safe_step
+    raise last_exc
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 76, in safe_step
+    res = step_fn(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\agents\automl_agent.py", line 38, in run_automl
+    automl.fit(X_train=X_train, y_train=y_train, **automl_settings)
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\automl.py", line 1913, in fit
+    self._state.task.estimator_class_from_str(estimator_name),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\task\task.py", line 345, in estimator_class_from_str
+    raise ValueError(
+ValueError: lr is not a built-in learner for this task type, only ['xgboost', 'xgb_limitdepth', 'rf', 'lgbm', 'lgbm_spark', 'rf_spark', 'lrl1', 'lrl2', 'catboost', 'extra_tree', 'kneighbor', 'transformer', 'transformer_ms', 'histgb', 'svc', 'sgd', 'nb_spark', 'enet', 'lassolars', 'glr_spark', 'lr_spark', 'svc_spark', 'gbt_spark', 'aft_spark'] are supported.Please use AutoML.add_learner() to add a customized learner.
+

@@ -1,0 +1,29 @@
+{
+  "columns": {
+    "age": {
+      "role": "numeric",
+      "impute": "median",
+      "scale": true
+    },
+    "income": {
+      "role": "numeric",
+      "impute": "median",
+      "scale": true
+    },
+    "utilization": {
+      "role": "numeric",
+      "impute": "median",
+      "scale": true
+    },
+    "default_flag": {
+      "role": "numeric",
+      "impute": "median",
+      "scale": true
+    }
+  },
+  "global": {
+    "target": "churn",
+    "task_type": "classification",
+    "imbalance_handling": "smote"
+  }
+}

@@ -1,0 +1,30 @@
+[2025-11-18 23:42:43] [INFO] Dispatching run from background worker
+[2025-11-18 23:42:43] [INFO] Orchestration started
+[2025-11-18 23:42:43] [INFO] START ps_agent attempt=1
+[2025-11-18 23:42:43] [ERROR] ERROR ps_agent attempt=1: parse_problem_or_generate() takes 2 positional arguments but 3 were given
+Traceback (most recent call last):
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 868, in safe_step
+    res = step_fn(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: parse_problem_or_generate() takes 2 positional arguments but 3 were given
+
+[2025-11-18 23:42:45] [INFO] START ps_agent attempt=2
+[2025-11-18 23:42:45] [ERROR] ERROR ps_agent attempt=2: parse_problem_or_generate() takes 2 positional arguments but 3 were given
+Traceback (most recent call last):
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 868, in safe_step
+    res = step_fn(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: parse_problem_or_generate() takes 2 positional arguments but 3 were given
+
+[2025-11-18 23:42:49] [ERROR] Run FAILED: parse_problem_or_generate() takes 2 positional arguments but 3 were given
+Traceback (most recent call last):
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 892, in orchestrate_run
+    ps_res = safe_step(
+             ^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 876, in safe_step
+    raise last_exc
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 868, in safe_step
+    res = step_fn(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: parse_problem_or_generate() takes 2 positional arguments but 3 were given
+

@@ -1,0 +1,133 @@
+[2025-11-15 14:13:51] Received run: {'run_id': None, 'user': {}, 'mode': 'ps_provided', 'problem_statement': 'Predict loan default from transactional history', 'preferences': {'primary_metric': 'f1', 'training_budget_minutes': 1, 'allow_synthetic': True, 'deploy': False}}
+[2025-11-15 14:13:51] Background worker dispatching run
+[2025-11-15 14:13:51] Orchestration started
+[2025-11-15 14:13:51] START ps_agent attempt=1
+[2025-11-15 14:13:51] OK ps_agent
+[2025-11-15 14:13:51] PS: {'task_type': 'classification', 'domain': 'general', 'target': None, 'entities': [], 'keywords': ['loan', 'default', 'transaction'], 'constraints': {'primary_metric': 'f1', 'training_budget_minutes': 1, 'allow_synthetic': True, 'deploy': False}, 'plan': {'required_modalities': ['tabular'], 'candidate_models': ['xgboost', 'lightgbm', 'logreg'], 'metrics': ['f1', 'roc_auc']}, 'raw_text': 'Predict lo
+[2025-11-15 14:13:51] START data_agent attempt=1
+[2025-11-15 14:20:12] OK data_agent
+[2025-11-15 14:20:12] Dataset: data/6d3461c8-2c37-4e8a-9317-6d6a8183cd5f_synthetic.csv
+[2025-11-15 14:20:12] START prep_agent attempt=1
+[2025-11-15 14:20:12] OK prep_agent
+[2025-11-15 14:20:12] Prep: {'train_path': 'artifacts\\6d3461c8-2c37-4e8a-9317-6d6a8183cd5f_train.npz', 'test_path': 'artifacts\\6d3461c8-2c37-4e8a-9317-6d6a8183cd5f_test.npz', 'transformer_path': 'artifacts\\6d3461c8-2c37-4e8a-
+[2025-11-15 14:20:12] START automl_agent attempt=1
+[2025-11-15 14:20:12] ERROR automl_agent attempt=1: 'NoneType' object is not callable
+Traceback (most recent call last):
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 138, in safe_step
+    res = step_fn(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\agents\automl_agent.py", line 355, in run_automl
+    res = _tabular_automl(X, y, run_id, ps, preferences, estimator_list=est_list)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\agents\automl_agent.py", line 183, in _tabular_automl
+    automl.fit(X_train=X_train, y_train=y_train, **settings)
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\automl.py", line 2004, in fit
+    self._search()
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\automl.py", line 2572, in _search
+    self._search_sequential()
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\automl.py", line 2382, in _search_sequential
+    analysis = tune.run(
+               ^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\tune\tune.py", line 894, in run
+    result = evaluation_function(trial_to_run.config)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\state.py", line 306, in _compute_with_config_base
+    ) = compute_estimator(
+        ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\ml.py", line 382, in compute_estimator
+    val_loss, metric_for_logging, train_time, pred_time = task.evaluate_model_CV(
+                                                          ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\task\generic_task.py", line 788, in evaluate_model_CV
+    val_loss_i, metric_i, train_time_i, pred_time_i = get_val_loss(
+                                                      ^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\ml.py", line 516, in get_val_loss
+    estimator.fit(X_train, y_train, budget=budget, free_mem_ratio=free_mem_ratio, **fit_kwargs)
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\model.py", line 1597, in fit
+    self._fit(X_train, y_train, callbacks=callbacks, **kwargs)
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\model.py", line 241, in _fit
+    model = self.estimator_class(**self.params)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: 'NoneType' object is not callable
+
+[2025-11-15 14:20:14] START automl_agent attempt=2
+[2025-11-15 14:20:14] ERROR automl_agent attempt=2: 'NoneType' object is not callable
+Traceback (most recent call last):
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 138, in safe_step
+    res = step_fn(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\agents\automl_agent.py", line 355, in run_automl
+    res = _tabular_automl(X, y, run_id, ps, preferences, estimator_list=est_list)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\agents\automl_agent.py", line 183, in _tabular_automl
+    automl.fit(X_train=X_train, y_train=y_train, **settings)
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\automl.py", line 2004, in fit
+    self._search()
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\automl.py", line 2572, in _search
+    self._search_sequential()
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\automl.py", line 2382, in _search_sequential
+    analysis = tune.run(
+               ^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\tune\tune.py", line 894, in run
+    result = evaluation_function(trial_to_run.config)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\state.py", line 306, in _compute_with_config_base
+    ) = compute_estimator(
+        ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\ml.py", line 382, in compute_estimator
+    val_loss, metric_for_logging, train_time, pred_time = task.evaluate_model_CV(
+                                                          ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\task\generic_task.py", line 788, in evaluate_model_CV
+    val_loss_i, metric_i, train_time_i, pred_time_i = get_val_loss(
+                                                      ^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\ml.py", line 516, in get_val_loss
+    estimator.fit(X_train, y_train, budget=budget, free_mem_ratio=free_mem_ratio, **fit_kwargs)
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\model.py", line 1597, in fit
+    self._fit(X_train, y_train, callbacks=callbacks, **kwargs)
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\model.py", line 241, in _fit
+    model = self.estimator_class(**self.params)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: 'NoneType' object is not callable
+
+[2025-11-15 14:20:18] Run FAILED: 'NoneType' object is not callable
+Traceback (most recent call last):
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 187, in orchestrate_run
+    train_res = safe_step(
+                ^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 146, in safe_step
+    raise last_exc
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 138, in safe_step
+    res = step_fn(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\agents\automl_agent.py", line 355, in run_automl
+    res = _tabular_automl(X, y, run_id, ps, preferences, estimator_list=est_list)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\agents\automl_agent.py", line 183, in _tabular_automl
+    automl.fit(X_train=X_train, y_train=y_train, **settings)
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\automl.py", line 2004, in fit
+    self._search()
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\automl.py", line 2572, in _search
+    self._search_sequential()
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\automl.py", line 2382, in _search_sequential
+    analysis = tune.run(
+               ^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\tune\tune.py", line 894, in run
+    result = evaluation_function(trial_to_run.config)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\state.py", line 306, in _compute_with_config_base
+    ) = compute_estimator(
+        ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\ml.py", line 382, in compute_estimator
+    val_loss, metric_for_logging, train_time, pred_time = task.evaluate_model_CV(
+                                                          ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\task\generic_task.py", line 788, in evaluate_model_CV
+    val_loss_i, metric_i, train_time_i, pred_time_i = get_val_loss(
+                                                      ^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\ml.py", line 516, in get_val_loss
+    estimator.fit(X_train, y_train, budget=budget, free_mem_ratio=free_mem_ratio, **fit_kwargs)
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\model.py", line 1597, in fit
+    self._fit(X_train, y_train, callbacks=callbacks, **kwargs)
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\venv\Lib\site-packages\flaml\automl\model.py", line 241, in _fit
+    model = self.estimator_class(**self.params)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: 'NoneType' object is not callable
+

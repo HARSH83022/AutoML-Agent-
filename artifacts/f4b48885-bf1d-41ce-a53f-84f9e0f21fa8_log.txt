@@ -1,0 +1,77 @@
+[2025-11-19 00:19:24] Received run: {'run_id': None, 'user': {}, 'mode': 'ps_provided', 'problem_statement': 'house price prediction', 'preferences': {'primary_metric': 'f1', 'training_budget_minutes': 2, 'allow_synthetic': True, 'deploy': False}}
+[2025-11-19 00:19:26] Background worker dispatching run
+[2025-11-19 00:19:26] Orchestration started
+[2025-11-19 00:19:26] START ps_agent attempt=1
+[2025-11-19 00:19:26] OK ps_agent
+[2025-11-19 00:19:26] PS: {'task_type': 'classification', 'domain': 'general', 'target': 'ion', 'entities': [], 'keywords': ['price'], 'constraints': {'primary_metric': 'f1', 'training_budget_minutes': 2, 'allow_synthetic': True, 'deploy': False}, 'plan': {'required_modalities': ['tabular'], 'candidate_models': ['xgboost', 'lightgbm', 'logreg'], 'metrics': ['f1', 'roc_auc']}, 'raw_text': 'house price prediction'}
+[2025-11-19 00:19:26] START data_agent attempt=1
+[2025-11-19 00:19:26] [data_agent] start. user keys: []
+[2025-11-19 00:19:26] [data_agent] queries: ['price', 'house price prediction', 'public tabular dataset general']
+[2025-11-19 00:29:02] [data_agent] attempting HF load: nateraw/airbnb-stock-price
+[2025-11-19 00:29:08] [data_agent] HF candidate saved: data/f4b48885-bf1d-41ce-a53f-84f9e0f21fa8_hf_nateraw_airbnb-stock-price.csv rows=373
+[2025-11-19 00:29:08] [data_agent] attempting HF load: nateraw/airbnb-stock-price-2
+[2025-11-19 00:29:11] [data_agent] HF candidate saved: data/f4b48885-bf1d-41ce-a53f-84f9e0f21fa8_hf_nateraw_airbnb-stock-price-2.csv rows=373
+[2025-11-19 00:29:11] [data_agent] attempting HF load: nateraw/airbnb-stock-price-new
+[2025-11-19 00:29:13] [data_agent] HF candidate nateraw/airbnb-stock-price-new skipped: An error occurred while generating the dataset
+
+All the data files must have the same columns, but at some point there are 6 new columns ({'Volume', 'Low', 'Open', 'Date', 'High', 'Adj.Close'}) and 6 missing columns ({'high', 'close_last', 'volume', 'open', 'low', 'date'}).
+
+This happened while the csv dataset builder was generating data using
+
+hf://datasets/nateraw/airbnb-stock-price-new/Airbnb.csv (at revision 0ff369182bf7a0741f776cff044abdf354baa589)
+
+Please either edit the data files to have matching columns, or separate them into different configurations (see docs at https://hf.co/docs/hub/datasets-manual-configuration#multiple-configurations)
+[2025-11-19 00:29:13] [data_agent] attempting HF load: nateraw/airbnb-stock-price-new-new
+[2025-11-19 00:29:15] [data_agent] HF candidate saved: data/f4b48885-bf1d-41ce-a53f-84f9e0f21fa8_hf_nateraw_airbnb-stock-price-new-new.csv rows=426
+[2025-11-19 00:29:15] [data_agent] attempting HF load: nateraw/airbnb-stock-price-new-new-new
+[2025-11-19 00:29:17] [data_agent] HF candidate saved: data/f4b48885-bf1d-41ce-a53f-84f9e0f21fa8_hf_nateraw_airbnb-stock-price-new-new-new.csv rows=426
+[2025-11-19 00:29:17] [data_agent] attempting HF load: nateraw/avocado-prices
+[2025-11-19 00:29:19] [data_agent] HF candidate saved: data/f4b48885-bf1d-41ce-a53f-84f9e0f21fa8_hf_nateraw_avocado-prices.csv rows=5000
+[2025-11-19 00:29:19] [data_agent] attempting HF load: zkho007/BitcoinPrice
+[2025-11-19 00:29:22] [data_agent] HF candidate zkho007/BitcoinPrice skipped: No (supported) data files found in zkho007/BitcoinPrice
+[2025-11-19 00:29:22] [data_agent] attempting HF load: KarelDO/CEBaB_train_confounding_price_food_ambiance_negative
+[2025-11-19 00:29:23] [data_agent] HF candidate KarelDO/CEBaB_train_confounding_price_food_ambiance_negative skipped: An error occurred while generating the dataset
+[2025-11-19 00:29:23] [data_agent] selected HF candidate data/f4b48885-bf1d-41ce-a53f-84f9e0f21fa8_hf_nateraw_avocado-prices.csv
+[2025-11-19 00:29:23] OK data_agent
+[2025-11-19 00:29:23] Dataset: data/f4b48885-bf1d-41ce-a53f-84f9e0f21fa8_hf_nateraw_avocado-prices.csv
+[2025-11-19 00:29:23] START prep_agent attempt=1
+[2025-11-19 00:29:24] ERROR prep_agent attempt=1: OneHotEncoder.__init__() got an unexpected keyword argument 'sparse'
+Traceback (most recent call last):
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 140, in safe_step
+    #             res = step_fn(*args, **kwargs)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\agents\prep_agent.py", line 565, in preprocess_dataset
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\agents\prep_agent.py", line 449, in _map_plan_to_transformers
+    cols = {}
+              
+TypeError: OneHotEncoder.__init__() got an unexpected keyword argument 'sparse'
+
+[2025-11-19 00:29:26] START prep_agent attempt=2
+[2025-11-19 00:29:26] ERROR prep_agent attempt=2: OneHotEncoder.__init__() got an unexpected keyword argument 'sparse'
+Traceback (most recent call last):
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 140, in safe_step
+    #             res = step_fn(*args, **kwargs)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\agents\prep_agent.py", line 565, in preprocess_dataset
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\agents\prep_agent.py", line 449, in _map_plan_to_transformers
+    cols = {}
+              
+TypeError: OneHotEncoder.__init__() got an unexpected keyword argument 'sparse'
+
+[2025-11-19 00:29:30] Run FAILED: OneHotEncoder.__init__() got an unexpected keyword argument 'sparse'
+Traceback (most recent call last):
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 186, in orchestrate_run
+    #         prep_res = safe_step(preprocess_dataset, run_id, dataset_path, ps, run_id=run_id, step_name="prep_agent")
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 148, in safe_step
+    #     raise last_exc
+        ^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 140, in safe_step
+    #             res = step_fn(*args, **kwargs)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\agents\prep_agent.py", line 565, in preprocess_dataset
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\agents\prep_agent.py", line 449, in _map_plan_to_transformers
+    cols = {}
+              
+TypeError: OneHotEncoder.__init__() got an unexpected keyword argument 'sparse'
+

@@ -1,0 +1,3 @@
+[2025-11-18 22:42:33] Interactive PS request have_ps=False
+[2025-11-18 22:42:33] START ps_agent attempt=1
+[2025-11-18 22:42:33] OK ps_agent

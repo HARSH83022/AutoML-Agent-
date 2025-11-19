@@ -1,0 +1,54 @@
+# fastapi
+# uvicorn[standard]
+# pydantic
+# datasets
+# pandas
+# numpy
+# scikit-learn
+# imbalanced-learn
+# category_encoders
+# flaml
+# xgboost
+# joblib
+# faker
+# matplotlib
+# python-dotenv
+# requests
+
+
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic
+
+datasets
+huggingface_hub
+transformers
+
+pandas
+numpy
+scikit-learn
+imbalanced-learn
+category_encoders
+xgboost
+lightgbm
+catboost
+flaml
+
+matplotlib
+shap
+
+joblib
+faker
+
+requests
+beautifulsoup4
+lxml
+
+kaggle
+
+python-dotenv
+rich
+typing-extensions
+python-dateutil
+

@@ -1,0 +1,25 @@
+{
+  "n_rows": 2000,
+  "n_features_raw": 3,
+  "n_features_transformed": 3,
+  "target": "default_flag",
+  "dropped_columns": [],
+  "datetime_extracted": [],
+  "numeric_columns": [
+    "age",
+    "income",
+    "utilization"
+  ],
+  "categorical_low_cardinality": [],
+  "categorical_high_cardinality": [],
+  "strategies": {
+    "missing": "median",
+    "categorical_encoding": "onehot",
+    "scaling": "standard",
+    "imbalance": "smote"
+  },
+  "leakage_checks_suggested": [
+    "check_id_like_columns",
+    "check_time_columns"
+  ]
+}

@@ -1,0 +1,2 @@
+[2025-11-19 15:46:50] [ps_agent] called with hint=diabetes detection
+[2025-11-19 15:47:49] [ps_agent] LLM failed; fallback options

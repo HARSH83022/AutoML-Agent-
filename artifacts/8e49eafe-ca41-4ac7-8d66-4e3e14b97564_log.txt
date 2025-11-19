@@ -1,0 +1,51 @@
+[2025-11-05 12:20:20] Received run: {'run_id': None, 'user': {}, 'mode': 'ps_provided', 'problem_statement': 'Predict loan default from transactional history', 'preferences': {'primary_metric': 'f1', 'latency_ms_budget': 200, 'training_budget_minutes': 1, 'allow_synthetic': True, 'deploy': False}}
+[2025-11-05 12:20:20] Orchestration started
+[2025-11-05 12:20:20] START ps_agent attempt=1
+[2025-11-05 12:20:54] OK ps_agent
+[2025-11-05 12:20:54] PS: {'task_type': 'classification', 'domain': 'general', 'target': None, 'entities': [], 'keywords': ['loan', 'default', 'transaction'], 'constraints': {'primary_metric': 'f1', 'latency_ms_budget': 200, 'training_budget_minutes': 1, 'allow_synthetic': True, 'deploy': False}, 'plan': {'required_modalities': ['tabular'], 'candidate_models': ['xgboost', 'lightgbm', 'logreg'], 'metrics': ['f1', 'roc_auc']
+[2025-11-05 12:20:54] START data_agent attempt=1
+[2025-11-05 12:21:01] ERROR data_agent attempt=1: 'DatasetInfo' object has no attribute 'lower'
+Traceback (most recent call last):
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 76, in safe_step
+    res = step_fn(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\agents\data_agent.py", line 74, in get_or_find_dataset
+    candidates = find_on_hf(run_id, queries, max_rows=5000)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\agents\data_agent.py", line 36, in find_on_hf
+    name_l = name.lower()
+             ^^^^^^^^^^
+AttributeError: 'DatasetInfo' object has no attribute 'lower'
+
+[2025-11-05 12:21:03] START data_agent attempt=2
+[2025-11-05 12:21:10] ERROR data_agent attempt=2: 'DatasetInfo' object has no attribute 'lower'
+Traceback (most recent call last):
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 76, in safe_step
+    res = step_fn(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\agents\data_agent.py", line 74, in get_or_find_dataset
+    candidates = find_on_hf(run_id, queries, max_rows=5000)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\agents\data_agent.py", line 36, in find_on_hf
+    name_l = name.lower()
+             ^^^^^^^^^^
+AttributeError: 'DatasetInfo' object has no attribute 'lower'
+
+[2025-11-05 12:21:14] Run FAILED: 'DatasetInfo' object has no attribute 'lower'
+Traceback (most recent call last):
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 96, in orchestrate_run
+    dataset_path = safe_step(get_or_find_dataset, run_id, ps, payload.get("user", {}), run_id=run_id, step_name="data_agent")
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 84, in safe_step
+    raise last_exc
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\main.py", line 76, in safe_step
+    res = step_fn(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\agents\data_agent.py", line 74, in get_or_find_dataset
+    candidates = find_on_hf(run_id, queries, max_rows=5000)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Dell\OneDrive\Desktop\automl-agent\app\agents\data_agent.py", line 36, in find_on_hf
+    name_l = name.lower()
+             ^^^^^^^^^^
+AttributeError: 'DatasetInfo' object has no attribute 'lower'
+

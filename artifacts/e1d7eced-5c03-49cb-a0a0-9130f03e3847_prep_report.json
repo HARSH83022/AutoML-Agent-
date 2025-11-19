@@ -1,0 +1,36 @@
+{
+  "n_rows": 2000,
+  "n_features_raw": 3,
+  "target": "default_flag",
+  "llm_plan_path": "artifacts\\e1d7eced-5c03-49cb-a0a0-9130f03e3847_llm_prep_plan.json",
+  "llm_plan": {
+    "columns": {
+      "age": {
+        "role": "numeric",
+        "impute": "median",
+        "scale": true
+      },
+      "income": {
+        "role": "numeric",
+        "impute": "median",
+        "scale": true
+      },
+      "utilization": {
+        "role": "numeric",
+        "impute": "median",
+        "scale": true
+      },
+      "default_flag": {
+        "role": "numeric",
+        "impute": "median",
+        "scale": true
+      }
+    },
+    "global": {
+      "target": null,
+      "task_type": "classification",
+      "imbalance_handling": "smote",
+      "allow_synthetic": true
+    }
+  }
+}

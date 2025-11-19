@@ -1,0 +1,10 @@
+[2025-11-19 15:37:33] Orchestration started
+[2025-11-19 15:37:33] START ps_agent attempt=1
+[2025-11-19 15:37:34] OK ps_agent
+[2025-11-19 15:37:34] START data_agent attempt=1
+[2025-11-19 15:37:34] OK data_agent
+[2025-11-19 15:37:34] START prep_agent attempt=1
+[2025-11-19 15:38:59] ERROR prep_agent: OneHotEncoder.__init__() got an unexpected keyword argument 'sparse'
+[2025-11-19 15:39:01] START prep_agent attempt=2
+[2025-11-19 15:39:32] ERROR prep_agent: OneHotEncoder.__init__() got an unexpected keyword argument 'sparse'
+[2025-11-19 15:39:36] FAILED: OneHotEncoder.__init__() got an unexpected keyword argument 'sparse'
