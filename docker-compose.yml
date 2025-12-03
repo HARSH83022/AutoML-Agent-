@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # Backend + Frontend
+  automl-platform:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - LLM_MODE=${LLM_MODE:-ollama}
+      - OLLAMA_URL=${OLLAMA_URL:-http://ollama:11434/api/generate}
+      - KAGGLE_USERNAME=${KAGGLE_USERNAME}
+      - KAGGLE_KEY=${KAGGLE_KEY}
+      - HF_TOKEN=${HF_TOKEN}
+    volumes:
+      - ./artifacts:/app/artifacts
+      - ./data:/app/data
+      - ./runs.db:/app/runs.db
+    depends_on:
+      - ollama
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+  
+  # Ollama (Local LLM)
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    command: serve
+  
+  # Nginx (Optional - for production)
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - automl-platform
+    restart: unless-stopped
+    profiles:
+      - production
+
+volumes:
+  ollama_data:
+
+networks:
+  default:
+    name: automl-network

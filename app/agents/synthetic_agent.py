@@ -143,18 +143,15 @@
 
 #     return path
 
-
 # app/agents/synthetic_agent.py
-import pandas as pd
 import numpy as np
+import pandas as pd
 from pathlib import Path
 from faker import Faker
-from app.storage import ensure_dirs
-
 fake = Faker()
-ensure_dirs()
+Path("data").mkdir(exist_ok=True)
 
-def synthesize_dataset(run_id: str, schema_hint: dict):
+def synthesize_dataset(run_id, schema_hint):
     rows = int(schema_hint.get("rows", 1000))
     columns = schema_hint.get("columns", [])
     data = {}
@@ -173,7 +170,6 @@ def synthesize_dataset(run_id: str, schema_hint: dict):
         else:
             data[name] = [fake.word() for _ in range(rows)]
     df = pd.DataFrame(data)
-    Path("data").mkdir(exist_ok=True)
     path = f"data/{run_id}_synthetic.csv"
     df.to_csv(path, index=False)
     return path

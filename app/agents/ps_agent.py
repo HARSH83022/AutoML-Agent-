@@ -196,50 +196,165 @@
 
 
 
+
+
+# # app/agents/ps_agent.py
+# import json
+# from typing import Dict, Any, Optional
+# from app.utils.llm_clients import llm_generate_json
+# from app.utils.run_logger import agent_log
+
+# def _prompt_parse_ps(text: str, preferences: Dict[str, Any], hint: Optional[str] = None) -> str:
+#     hint_text = f"Topic hint: {hint}\n" if hint else ""
+#     return f"""
+# You are a data scientist assistant. Parse the following problem statement into JSON with keys:
+# task_type, domain, target (if present), entities (list), keywords (list), constraints (object), plan (object), raw_text.
+
+# {hint_text}
+# Preferences: {json.dumps(preferences)}
+
+# Input:
+# \"\"\"{text}\"\"\"
+
+# Return ONLY valid JSON. Do NOT include any other text.
+# """
+
+# def _prompt_generate_options(hint: Optional[str], preferences: Dict[str, Any]) -> str:
+#     hint_text = hint or "general"
+#     return f"""
+# You are a data scientist assistant. Based on topic '{hint_text}', generate 2 to 3 concise problem-statement OPTIONS.
+# Each option should be a JSON object with fields: title, statement, task_type, metrics, plan.
+# Return ONLY valid JSON: {{ "options": [ {{...}}, {{...}} ] }}
+# """
+
+# def fallback_parse(text: str, preferences: Dict[str, Any], hint: Optional[str] = None) -> Dict[str, Any]:
+#     t = (text or "").lower()
+#     out = {
+#         "task_type":"classification",
+#         "domain":preferences.get("domain","general"),
+#         "target":None,
+#         "entities":[],
+#         "keywords":[],
+#         "constraints":preferences,
+#         "plan":{"required_modalities":["tabular"], "candidate_models":["xgboost","lightgbm","rf"], "metrics":[preferences.get("primary_metric","f1")]},
+#         "raw_text": text or hint or ""
+#     }
+#     if any(k in t for k in ("regress","predict value","price","amount","sale price")):
+#         out["task_type"] = "regression"
+#     for cand in ["price","target","label","default","churn","income","age","winner","result","vote"]:
+#         if cand in t or (hint and cand in hint.lower()):
+#             out["target"] = cand
+#             out["keywords"].append(cand)
+#     if not out["keywords"] and hint:
+#         out["keywords"] = [w.strip() for w in hint.split()[:5]]
+#     return out
+
+# def parse_problem_or_generate(run_id: str, problem_statement: str, preferences: Dict[str, Any]) -> Dict[str, Any]:
+#     hint = preferences.get("hint") if isinstance(preferences, dict) else None
+#     agent_log(run_id, f"[ps_agent] called with hint={hint}", agent="ps_agent")
+#     if not problem_statement or problem_statement.strip() == "":
+#         p = _prompt_generate_options(hint, preferences)
+#         j = llm_generate_json(p)
+#         if j and isinstance(j, dict) and "options" in j:
+#             agent_log(run_id, "[ps_agent] generated options from LLM", agent="ps_agent")
+#             return j
+#         return {"options":[
+#             {"title":"Loan Default Prediction","statement":"Predict probability of loan default using applicant and transaction history.","task_type":"classification","metrics":["f1","roc_auc"],"plan":{"required_modalities":["tabular"]}},
+#             {"title":"Customer Churn Prediction","statement":"Predict whether a customer will churn within 90 days.","task_type":"classification","metrics":["precision","recall"],"plan":{"required_modalities":["tabular"]}},
+#             {"title":"House Price Regression","statement":"Predict house sale price given property features.","task_type":"regression","metrics":["rmse","r2"],"plan":{"required_modalities":["tabular"]}}
+#         ]}
+#     p = _prompt_parse_ps(problem_statement, preferences, hint=hint)
+#     j = llm_generate_json(p)
+#     if j and isinstance(j, dict):
+#         j.setdefault("task_type", "classification")
+#         j.setdefault("plan", {"required_modalities":["tabular"], "candidate_models":["xgboost","lightgbm","rf"], "metrics":[preferences.get("primary_metric","f1")]})
+#         j["raw_text"] = problem_statement
+#         agent_log(run_id, "[ps_agent] parsed PS via LLM", agent="ps_agent")
+#         return j
+#     agent_log(run_id, "[ps_agent] LLM parse failed, using fallback", agent="ps_agent")
+#     return fallback_parse(problem_statement, preferences, hint=hint)
+
+
+
+
 # app/agents/ps_agent.py
-import re
+
 import json
 from typing import Dict, Any, Optional
+
 from app.utils.llm_clients import llm_generate_json
 from app.utils.run_logger import agent_log
 
 
-def _prompt_parse_ps(text: str, preferences: Dict[str, Any], hint: Optional[str] = None) -> str:
-    """LLM prompt to parse a user-provided problem statement."""
-    hint_text = f"Topic hint: {hint}\n" if hint else ""
-    return f"""
-You are a data scientist assistant. Parse the following problem statement into structured JSON.
+# -----------------------------
+# PROMPT TEMPLATES
+# -----------------------------
 
-Return ONLY JSON with keys:
-task_type, domain, target, entities, keywords, constraints, plan, raw_text.
+def _prompt_parse_ps(text: str, preferences: Dict[str, Any], hint: Optional[str] = None) -> str:
+    hint_text = f"Topic hint: {hint}\n" if hint else ""
+
+    return f"""
+You are an expert Machine Learning project planner.
+
+Parse the following problem statement into STRICT JSON with fields:
+- task_type: "classification" or "regression"
+- domain: short description
+- target: column name if identifiable else null
+- entities: list
+- keywords: list
+- constraints: dictionary
+- plan: object with fields:
+    - required_modalities: ["tabular"]
+    - candidate_models: list of ML models
+    - metrics: list of metrics
+- raw_text: copy of input PS
 
 {hint_text}
 Preferences: {json.dumps(preferences)}
 
-Input:
+Input Problem Statement:
 \"\"\"{text}\"\"\"
 
-Return ONLY JSON.
+Return ONLY VALID JSON. NO extra words.
 """
 
 
 def _prompt_generate_options(hint: Optional[str], preferences: Dict[str, Any]) -> str:
-    """LLM prompt to generate 2–3 problem statement options for the user's topic/hint."""
-    hint_text = hint or "general topic"
+    hint_text = hint or "general"
+
     return f"""
-You are a data scientist assistant. Based on topic '{hint_text}', generate 2–3 high-quality problem statement OPTIONS.
+You are an expert ML assistant.
+Generate 3 problem statement OPTIONS for topic: "{hint_text}".
 
-Each option must be JSON with:
-title, statement, task_type, metrics, plan.
+Each option MUST be a JSON object:
+{{
+  "title": "...",
+  "statement": "...",
+  "task_type": "classification" or "regression",
+  "metrics": ["f1", "accuracy", ...],
+  "plan": {{
+     "required_modalities": ["tabular"],
+     "candidate_models": ["xgboost","lightgbm","rf"],
+     "metrics": ["f1"]
+  }}
+}}
 
-Return ONLY JSON like:
-{{ "options": [ {{...}}, {{...}} ] }}
+Return ONLY valid JSON in this shape:
+{{
+  "options": [ {{...}}, {{...}}, {{...}} ]
+}}
 """
 
 
-def fallback_parse(text: str, preferences: Dict[str, Any], hint: Optional[str] = None) -> Dict[str, Any]:
-    """Used when LLM fails — returns a deterministic safe PS structure."""
+# -----------------------------
+# FALLBACK (NO LLM)
+# -----------------------------
+
+def fallback_parse(text: str, preferences: Dict[str, Any], hint: Optional[str]) -> Dict[str, Any]:
+    """Used when LLM fails to parse the PS."""
+
     t = (text or "").lower()
+
     out = {
         "task_type": "classification",
         "domain": preferences.get("domain", "general"),
@@ -250,81 +365,114 @@ def fallback_parse(text: str, preferences: Dict[str, Any], hint: Optional[str] =
         "plan": {
             "required_modalities": ["tabular"],
             "candidate_models": ["xgboost", "lightgbm", "rf"],
-            "metrics": [preferences.get("primary_metric", "f1")]
+            "metrics": [preferences.get("primary_metric", "f1")],
         },
-        "raw_text": text or hint or ""
+        "raw_text": text or hint or "",
     }
 
-    # Regression detection
-    if "regress" in t or "price" in t or "amount" in t:
+    # detect regression
+    if any(
+        w in t
+        for w in ["regress", "price", "amount", "value", "continuous", "prediction of value"]
+    ):
         out["task_type"] = "regression"
 
-    # simple keyword / target extraction
-    for cand in ["price", "age", "income", "churn", "default"]:
-        if cand in t:
-            out["target"] = cand
+    # detect target keywords
+    for cand in ["price", "target", "label", "default", "churn", "income", "risk", "age"]:
+        if cand in t or (hint and cand in hint.lower()):
             out["keywords"].append(cand)
+            out["target"] = cand
 
-    if hint and not out["keywords"]:
-        out["keywords"] = hint.lower().split()[:3]
+    # fallback keywords from hint
+    if not out["keywords"] and hint:
+        out["keywords"] = hint.split()[:5]
 
     return out
 
 
+# -----------------------------
+# MAIN FUNCTION
+# -----------------------------
+
 def parse_problem_or_generate(run_id: str, problem_statement: str, preferences: Dict[str, Any]):
     """
-    Main entrypoint used by orchestrator and /ps endpoint.
-    If problem_statement is empty => generate options.
-    If provided => parse it properly.
+    Entry point for PS Agent.
+    Handles:
+      - full PS parsing
+      - PS option generation
+      - fallback mode
     """
-    hint = preferences.get("hint")
-    agent_log(run_id, f"[ps_agent] called with hint={hint}", agent="ps_agent")
 
-    # CASE A: User did NOT provide PS -> generate PS options
-    if not problem_statement or problem_statement.strip() == "":
+    hint = preferences.get("hint") if isinstance(preferences, dict) else None
+    agent_log(run_id, f"[ps_agent] called | hint={hint}", agent="ps_agent")
+
+    # --------------------------------------------------------------------
+    # CASE 1: USER DID NOT PROVIDE A PROBLEM STATEMENT → GENERATE OPTIONS
+    # --------------------------------------------------------------------
+    if not problem_statement or not problem_statement.strip():
+        agent_log(run_id, "[ps_agent] No PS provided → generating options", agent="ps_agent")
+
         prompt = _prompt_generate_options(hint, preferences)
-        out = llm_generate_json(prompt)
+        j = llm_generate_json(prompt)
 
-        if out and "options" in out:
-            agent_log(run_id, "[ps_agent] LLM returned PS options", agent="ps_agent")
-            return out
+        if j and isinstance(j, dict) and "options" in j:
+            agent_log(run_id, "[ps_agent] Generated options via LLM", agent="ps_agent")
+            return j
 
-        # fallback option set
-        agent_log(run_id, "[ps_agent] LLM failed; fallback options", agent="ps_agent")
+        # LLM FAILED → provide fallback options
+        agent_log(run_id, "[ps_agent] LLM failed. Returning fallback options.", agent="ps_agent")
         return {
             "options": [
                 {
-                    "title": "Customer Churn Prediction",
-                    "statement": "Predict whether a customer will churn based on behavior and demographic history.",
+                    "title": "Loan Default Prediction",
+                    "statement": "Predict whether a customer will default on a loan.",
                     "task_type": "classification",
-                    "metrics": ["f1"],
-                    "plan": {"required_modalities": ["tabular"]}
+                    "metrics": ["f1", "roc_auc"],
+                    "plan": {"required_modalities": ["tabular"]},
                 },
                 {
-                    "title": "Loan Default Prediction",
-                    "statement": "Predict probability of loan default using applicant features.",
+                    "title": "Customer Churn Prediction",
+                    "statement": "Predict whether a customer will churn within 90 days.",
                     "task_type": "classification",
-                    "metrics": ["roc_auc"],
-                    "plan": {"required_modalities": ["tabular"]}
-                }
+                    "metrics": ["precision", "recall"],
+                    "plan": {"required_modalities": ["tabular"]},
+                },
+                {
+                    "title": "House Price Prediction",
+                    "statement": "Predict house prices from property attributes.",
+                    "task_type": "regression",
+                    "metrics": ["rmse", "r2"],
+                    "plan": {"required_modalities": ["tabular"]},
+                },
             ]
         }
 
-    # CASE B: User provided PS → parse it
+    # --------------------------------------------------------------------
+    # CASE 2: USER PROVIDED PROBLEM STATEMENT → PARSE IT
+    # --------------------------------------------------------------------
+    agent_log(run_id, "[ps_agent] Parsing user problem statement via LLM", agent="ps_agent")
+
     prompt = _prompt_parse_ps(problem_statement, preferences, hint)
     parsed = llm_generate_json(prompt)
 
     if parsed and isinstance(parsed, dict):
+        # ensure minimum fields
         parsed.setdefault("task_type", "classification")
-        parsed.setdefault("plan", {
-            "required_modalities": ["tabular"],
-            "candidate_models": ["xgboost", "lightgbm"],
-            "metrics": [preferences.get("primary_metric", "f1")]
-        })
+        parsed.setdefault(
+            "plan",
+            {
+                "required_modalities": ["tabular"],
+                "candidate_models": ["xgboost", "lightgbm", "rf"],
+                "metrics": [preferences.get("primary_metric", "f1")],
+            },
+        )
         parsed["raw_text"] = problem_statement
-        agent_log(run_id, "[ps_agent] PS parsed via LLM", agent="ps_agent")
+
+        agent_log(run_id, "[ps_agent] Parsed PS successfully", agent="ps_agent")
         return parsed
 
-    # fallback
-    agent_log(run_id, "[ps_agent] LLM parsing failed, fallback", agent="ps_agent")
+    # --------------------------------------------------------------------
+    # LLM PARSING FAILED → USE FALLBACK
+    # --------------------------------------------------------------------
+    agent_log(run_id, "[ps_agent] LLM parse failed → using fallback", agent="ps_agent")
     return fallback_parse(problem_statement, preferences, hint)

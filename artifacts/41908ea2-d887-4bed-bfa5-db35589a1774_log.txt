@@ -1,1 +1,0 @@
-[2025-11-18 23:42:41] Received run: {'run_id': None, 'user': {}, 'mode': 'ps_provided', 'problem_statement': 'Predict probability of loan default using applicant and transaction history.', 'preferences': {'primary_metric': 'f1', 'training_budget_minutes': 2, 'allow_synthetic': True, 'deploy': False}}

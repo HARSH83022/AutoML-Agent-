@@ -16,39 +16,38 @@
 # requests
 
 
+
+
+
 fastapi
 uvicorn[standard]
-python-multipart
 pydantic
-
 datasets
-huggingface_hub
-transformers
-
 pandas
 numpy
 scikit-learn
 imbalanced-learn
-category_encoders
+flaml
 xgboost
 lightgbm
 catboost
-flaml
-
-matplotlib
-shap
-
 joblib
 faker
-
+matplotlib
+python-dotenv
 requests
 beautifulsoup4
-lxml
+transformers
+huggingface-hub
 
+# LLM Providers
+openai>=1.0.0
+anthropic>=0.18.0
+google-generativeai>=0.3.0
+
+# Additional ML libraries
+optuna
 kaggle
 
-python-dotenv
-rich
-typing-extensions
-python-dateutil
-
+# Web server for Azure
+gunicorn

@@ -1,2 +1,0 @@
-[2025-11-19 15:46:34] START ps_agent attempt=1
-[2025-11-19 15:47:33] OK ps_agent

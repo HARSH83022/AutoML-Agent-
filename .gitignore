@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+env/
+venv/
+.venv/
+VENV/
+pip-wheel-metadata/
+
+# Virtual env and IDEs
+venv/
+.vscode/
+.idea/
+
+# Artifacts and data
+artifacts/
+data/
+*.db
+runs.db
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Large model caches and HF cache
+.huggingface/
+.cache/
+__pycache__/
+
+# System
+.DS_Store
+Thumbs.db
+
+# Git LFS placeholder (if you use LFS)
+*.bin

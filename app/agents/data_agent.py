@@ -1,673 +1,723 @@
-# # app/agents/data_agent.py
-# import os
-# import math
-# import time
-# import json
-# import logging
-# from pathlib import Path
-# from typing import List, Dict, Optional
-
-# import pandas as pd
-# import requests
-# from bs4 import BeautifulSoup
-
-# # huggingface
-# from huggingface_hub import list_datasets as hf_list_datasets
-# from datasets import load_dataset, DatasetDict
-
-# # kaggle
-# try:
-#     from kaggle.api.kaggle_api_extended import KaggleApi
-#     _have_kaggle = True
-# except Exception:
-#     _have_kaggle = False
-
-# from app.utils.llm_clients import llm_generate_json
-# from .synthetic_agent import synthesize_dataset
-# from app.storage import ensure_dirs
-# from app.utils.run_logger import agent_log
-
-# DATA_DIR = "data"
-# ensure_dirs()
-# os.makedirs(DATA_DIR, exist_ok=True)
-
-# log = logging.getLogger("data_agent")
-# log.setLevel(logging.INFO)
-
-# # ---------------------
-# # Helpers / scoring
-# # ---------------------
-# def _score_candidate(ds_meta: dict, ps: dict) -> float:
-#     est_rows = ds_meta.get("est_rows") or 0
-#     has_target = 0
-#     schema = ds_meta.get("schema") or {}
-#     features = schema.get("features") or []
-#     target_name = ps.get("target")
-#     if target_name and target_name in features:
-#         has_target = 1
-#     license_ok = 1 if str(ds_meta.get("license","")).lower().startswith(("cc","mit","apache")) else 0
-#     score = math.tanh(est_rows/20000.0) * 0.6 + 0.3*has_target + 0.1*license_ok
-#     return float(score)
-
-# def _prompt_build_queries(ps: dict) -> str:
-#     return f"""
-# You are a dataset-finding assistant. Produce a JSON object with a list 'queries' containing 3 short search queries to find public tabular datasets relevant to this problem statement:
-# Problem statement: {ps.get('raw_text') or ps}
-# Keywords: {ps.get('keywords') or []}
-# Return JSON only: {{ "queries": ["...","...","..."] }}
-# """
-
-# # ---------------------
-# # Hugging Face search
-# # ---------------------
-# def find_on_hf(run_id: str, query_list: List[str], max_rows:int=5000) -> List[dict]:
-#     """
-#     Search Hugging Face datasets for names that match tokens in the queries.
-#     Returns metadata dicts with local CSV download path where possible.
-#     """
-#     results = []
-#     try:
-#         ds_list = hf_list_datasets()  # returns DatasetInfo objects
-#     except Exception as e:
-#         agent_log(run_id, f"[data_agent] HF list_datasets failed: {e}")
-#         ds_list = []
-
-#     # build candidate names by simple token match on the dataset id or title
-#     candidates = []
-#     for q in query_list:
-#         if not q or not str(q).strip():
-#             continue
-#         q_tokens = str(q).lower().split()
-#         for entry in ds_list:
-#             try:
-#                 # DatasetInfo has .id or .repo_id or string form
-#                 name_str = None
-#                 if hasattr(entry, "id"):
-#                     name_str = entry.id
-#                 elif hasattr(entry, "repo_id"):
-#                     name_str = entry.repo_id
-#                 else:
-#                     name_str = str(entry)
-#                 if not name_str:
-#                     continue
-#             except Exception:
-#                 name_str = str(entry)
-#             name_l = name_str.lower()
-#             if all(tok in name_l for tok in q_tokens):
-#                 candidates.append(name_str)
-#         if len(candidates) >= 8:
-#             break
-
-#     # dedupe and limit
-#     candidates = list(dict.fromkeys(candidates))[:8]
-
-#     for cand in candidates:
-#         try:
-#             agent_log(run_id, f"[data_agent] attempting HF load: {cand}")
-#             # try load_dataset(cand)
-#             ds = load_dataset(cand, split=None)  # may return DatasetDict
-#             # choose a sensible split
-#             if isinstance(ds, DatasetDict):
-#                 split = "train" if "train" in ds.keys() else list(ds.keys())[0]
-#                 sub = ds[split]
-#             else:
-#                 sub = ds
-#             df = sub.to_pandas()
-#             if len(df) > max_rows:
-#                 df = df.sample(max_rows, random_state=0)
-#             safe_name = cand.replace("/", "_").replace(":", "_")
-#             path = f"{DATA_DIR}/{run_id}_hf_{safe_name}.csv"
-#             df.to_csv(path, index=False)
-#             meta = {"name": cand, "uri": cand, "license": "unknown", "est_rows": len(df),
-#                     "schema": {"features": list(df.columns), "target": None}, "downloaded_to": path}
-#             results.append(meta)
-#             agent_log(run_id, f"[data_agent] HF candidate saved: {path} rows={len(df)}")
-#         except Exception as e:
-#             agent_log(run_id, f"[data_agent] HF candidate {cand} skipped: {e}")
-#             continue
-#     return results
-
-# # ---------------------
-# # Kaggle search (optional)
-# # ---------------------
-# def find_on_kaggle(run_id: str, queries: List[str], max_rows:int=5000) -> List[dict]:
-#     results = []
-#     if not _have_kaggle:
-#         agent_log(run_id, "[data_agent] Kaggle client not available")
-#         return results
-#     try:
-#         api = KaggleApi()
-#         api.authenticate()
-#     except Exception as e:
-#         agent_log(run_id, f"[data_agent] Kaggle auth failed: {e}")
-#         return results
-
-#     for q in queries:
-#         try:
-#             search_res = api.datasets_list(search=q, page=1, max_results=10)
-#             for ds in search_res:
-#                 try:
-#                     slug = f"{ds.ref}"
-#                     agent_log(run_id, f"[data_agent] downloading kaggle dataset {slug}")
-#                     dest_dir = f"{DATA_DIR}/kaggle_{run_id}"
-#                     os.makedirs(dest_dir, exist_ok=True)
-#                     api.dataset_download_files(slug, path=dest_dir, unzip=True, quiet=True)
-#                     # attempt to find a csv file
-#                     csvs = [str(p) for p in Path(dest_dir).glob("**/*.csv")]
-#                     if not csvs:
-#                         continue
-#                     df = pd.read_csv(csvs[0])
-#                     if len(df) > max_rows:
-#                         df = df.sample(max_rows, random_state=0)
-#                     path = f"{DATA_DIR}/{run_id}_kaggle_{Path(csvs[0]).stem}.csv"
-#                     df.to_csv(path, index=False)
-#                     meta = {"name": slug, "uri": slug, "license": "unknown", "est_rows": len(df),
-#                             "schema": {"features": list(df.columns), "target": None}, "downloaded_to": path}
-#                     results.append(meta)
-#                     agent_log(run_id, f"[data_agent] Kaggle candidate saved: {path}")
-#                 except Exception as e:
-#                     agent_log(run_id, f"[data_agent] Kaggle candidate skip {ds.ref}: {e}")
-#         except Exception as e:
-#             agent_log(run_id, f"[data_agent] Kaggle search error for '{q}': {e}")
-#     return results
-
-# # ---------------------
-# # DuckDuckGo quick web search + simple CSV / table scraping
-# # ---------------------
-# def ddg_search_links(query: str, max_results:int=6) -> List[str]:
-#     """Perform a lightweight DuckDuckGo HTML search and return hrefs (best-effort)."""
-#     try:
-#         url = "https://duckduckgo.com/html/"
-#         r = requests.post(url, data={"q": query}, timeout=10, headers={"User-Agent":"Mozilla/5.0"})
-#         soup = BeautifulSoup(r.text, "html.parser")
-#         links = []
-#         for a in soup.find_all("a", href=True):
-#             href = a["href"]
-#             if href.startswith("/l/?kh="):
-#                 # ddg redirect -> extract url param 'uddg'
-#                 from urllib.parse import parse_qs, urlparse, unquote
-#                 qs = parse_qs(urlparse(href).query)
-#                 if "uddg" in qs:
-#                     links.append(unquote(qs["uddg"][0]))
-#                 continue
-#             if href.startswith("http"):
-#                 links.append(href)
-#             if len(links) >= max_results:
-#                 break
-#         return links
-#     except Exception:
-#         return []
-
-# def try_scrape_tabular(run_id: str, url: str, max_rows:int=5000) -> Optional[dict]:
-#     """
-#     Try to fetch URL, handle:
-#       - direct CSV (.csv)
-#       - HTML table(s) -> convert to pandas
-#     Save a CSV locally and return metadata dict on success.
-#     """
-#     try:
-#         agent_log(run_id, f"[data_agent] attempting web scrape: {url}")
-#         r = requests.get(url, timeout=12, headers={"User-Agent":"Mozilla/5.0"})
-#         if r.status_code != 200:
-#             return None
-#         # direct CSV
-#         if url.lower().endswith(".csv") or "text/csv" in (r.headers.get("content-type","")):
-#             df = pd.read_csv(pd.compat.StringIO(r.text)) if hasattr(pd, "compat") else pd.read_csv(io.StringIO(r.text))
-#             if len(df) > max_rows:
-#                 df = df.sample(max_rows, random_state=0)
-#             fname = f"{DATA_DIR}/{run_id}_web_csv.csv"
-#             df.to_csv(fname, index=False)
-#             return {"name": url, "uri": url, "license":"unknown", "est_rows": len(df),
-#                     "schema":{"features": list(df.columns), "target": None}, "downloaded_to": fname}
-#         # try parse HTML tables
-#         soup = BeautifulSoup(r.text, "html.parser")
-#         tables = soup.find_all("table")
-#         if not tables:
-#             return None
-#         for i, tbl in enumerate(tables):
-#             try:
-#                 df = pd.read_html(str(tbl))[0]
-#                 if df.shape[0] == 0 or df.shape[1] == 0:
-#                     continue
-#                 if len(df) > max_rows:
-#                     df = df.sample(max_rows, random_state=0)
-#                 fname = f"{DATA_DIR}/{run_id}_web_table_{i}.csv"
-#                 df.to_csv(fname, index=False)
-#                 return {"name": url, "uri": url, "license": "unknown", "est_rows": len(df),
-#                         "schema": {"features": list(df.columns), "target": None}, "downloaded_to": fname}
-#             except Exception:
-#                 continue
-#         return None
-#     except Exception as e:
-#         agent_log(run_id, f"[data_agent] web scrape failed for {url}: {e}")
-#         return None
-
-# def find_on_web(run_id:str, query_list: List[str], max_rows:int=5000) -> List[dict]:
-#     results = []
-#     for q in query_list:
-#         try:
-#             links = ddg_search_links(q, max_results=6)
-#             for url in links:
-#                 meta = try_scrape_tabular(run_id, url, max_rows=max_rows)
-#                 if meta:
-#                     results.append(meta)
-#                     if len(results) >= 3:
-#                         return results
-#         except Exception as e:
-#             agent_log(run_id, f"[data_agent] web search error {q}: {e}")
-#             continue
-#     return results
-
-# # ---------------------
-# # Main orchestration
-# # ---------------------
-# def get_or_find_dataset(run_id: str, ps: dict, user: dict, min_rows:int=500) -> str:
-#     """
-#     Priority:
-#       1) user-provided upload_path (user['upload_path'])
-#       2) search HF datasets (hf_list_datasets + load_dataset)
-#       3) search Kaggle (if available)
-#       4) web search & scrape (duckduckgo -> CSV/HTML table)
-#       5) synthesize dataset (if allowed)
-#     Returns local CSV path for selected dataset.
-#     """
-#     agent_log(run_id, f"[data_agent] get_or_find_dataset start. user keys: {list(user.keys())}")
-
-#     # 1) user provided upload
-#     if user and user.get("upload_path"):
-#         path = user["upload_path"]
-#         if not Path(path).exists():
-#             raise FileNotFoundError(f"Provided upload_path not found: {path}")
-#         agent_log(run_id, f"[data_agent] using user-provided upload_path: {path}")
-#         return path
-
-#     # Build queries using LLM
-#     try:
-#         q_prompt = _prompt_build_queries(ps)
-#         qjson = llm_generate_json(q_prompt) or {}
-#         queries = qjson.get("queries", [])[:3]
-#     except Exception as e:
-#         agent_log(run_id, f"[data_agent] LLM queries failed: {e}")
-#         queries = []
-
-#     if not queries:
-#         keywords = ps.get("keywords") or [ps.get("domain","")]
-#         queries = [ " ".join(keywords) if isinstance(keywords, list) else str(keywords),
-#                     ps.get("raw_text",""),
-#                     "public tabular dataset " + (ps.get("domain","") or "")
-#                   ]
-#     queries = [q for q in queries if q and str(q).strip()][:3]
-#     agent_log(run_id, f"[data_agent] queries: {queries}")
-
-#     # 2) Hugging Face
-#     hf_candidates = find_on_hf(run_id, queries, max_rows=5000)
-#     for c in hf_candidates:
-#         c["quality_score"] = _score_candidate(c, ps)
-#     hf_sorted = sorted(hf_candidates, key=lambda x: x.get("quality_score",0), reverse=True)
-#     for cand in hf_sorted:
-#         if cand.get("est_rows",0) >= min_rows:
-#             agent_log(run_id, f"[data_agent] selected HF candidate {cand['downloaded_to']}")
-#             return cand["downloaded_to"]
-#     if hf_sorted:
-#         agent_log(run_id, f"[data_agent] no HF above min_rows; returning best HF candidate {hf_sorted[0]['downloaded_to']}")
-#         return hf_sorted[0]["downloaded_to"]
-
-#     # 3) Kaggle
-#     kag_candidates = find_on_kaggle(run_id, queries, max_rows=5000)
-#     for c in kag_candidates:
-#         c["quality_score"] = _score_candidate(c, ps)
-#     kag_sorted = sorted(kag_candidates, key=lambda x: x.get("quality_score",0), reverse=True)
-#     for cand in kag_sorted:
-#         if cand.get("est_rows",0) >= min_rows:
-#             agent_log(run_id, f"[data_agent] selected Kaggle candidate {cand['downloaded_to']}")
-#             return cand["downloaded_to"]
-#     if kag_sorted:
-#         agent_log(run_id, f"[data_agent] returning best Kaggle candidate {kag_sorted[0]['downloaded_to']}")
-#         return kag_sorted[0]["downloaded_to"]
-
-#     # 4) Web
-#     web_candidates = find_on_web(run_id, queries, max_rows=5000)
-#     for c in web_candidates:
-#         c["quality_score"] = _score_candidate(c, ps)
-#     web_sorted = sorted(web_candidates, key=lambda x: x.get("quality_score",0), reverse=True)
-#     for cand in web_sorted:
-#         if cand.get("est_rows",0) >= min_rows:
-#             agent_log(run_id, f"[data_agent] selected Web candidate {cand['downloaded_to']}")
-#             return cand["downloaded_to"]
-#     if web_sorted:
-#         agent_log(run_id, f"[data_agent] returning best Web candidate {web_sorted[0]['downloaded_to']}")
-#         return web_sorted[0]["downloaded_to"]
-
-#     # 5) fallback to synthetic
-#     allow_synth = ps.get("plan",{}).get("allow_synthetic", True) or ps.get("constraints",{}).get("allow_synthetic", True) or True
-#     if allow_synth:
-#         agent_log(run_id, "[data_agent] No public dataset found; generating synthetic dataset.")
-#         schema_hint = ps.get("schema_hint") or {"rows": 2000, "columns":[
-#             {"name":"age","type":"int","range":[18,80]},
-#             {"name":"income","type":"float","range":[1000,100000]},
-#             {"name":"utilization","type":"float","range":[0,1]},
-#             {"name":"default_flag","type":"binary","imbalance_ratio":0.2}
-#         ]}
-#         synth_uri = synthesize_dataset(run_id, schema_hint)
-#         # If synthesize_dataset returns path or dict, unify
-#         if isinstance(synth_uri, dict):
-#             return synth_uri.get("dataset_uri")
-#         return synth_uri
-
-#     raise RuntimeError("No dataset found and synthetic not allowed.")
-
-
-
-
-
 # app/agents/data_agent.py
-import os
-import math
-import io
-import json
-import time
-import logging
-from pathlib import Path
-from typing import List, Dict, Optional
+"""
+Data Agent - Handles dataset acquisition from multiple sources with fallback chain.
 
-import pandas as pd
-import requests
-from bs4 import BeautifulSoup
-
-try:
-    from huggingface_hub import list_datasets as hf_list_datasets
-except Exception:
-    hf_list_datasets = None
-
-try:
-    from datasets import load_dataset, DatasetDict
-except Exception:
-    load_dataset = None
-    DatasetDict = tuple
-
-try:
-    from kaggle.api.kaggle_api_extended import KaggleApi
-    _have_kaggle = True
-except Exception:
-    KaggleApi = None
-    _have_kaggle = False
-
-from app.utils.llm_clients import llm_generate_json
-from app.utils.run_logger import agent_log
-from app.storage import ensure_dirs
-
-DATA_DIR = "data"
-ensure_dirs()
-os.makedirs(DATA_DIR, exist_ok=True)
-
-log = logging.getLogger("data_agent")
-log.setLevel(logging.INFO)
-
-def _score_candidate(ds_meta: dict, ps: dict) -> float:
-    est_rows = ds_meta.get("est_rows") or 0
-    has_target = 0
-    schema = ds_meta.get("schema") or {}
-    features = schema.get("features") or []
-    target_name = ps.get("target")
-    if target_name and target_name in features:
-        has_target = 1
-    license_ok = 1 if str(ds_meta.get("license", "")).lower().startswith(("cc","mit","apache")) else 0
-    score = math.tanh(est_rows / 20000.0) * 0.6 + 0.3 * has_target + 0.1 * license_ok
-    return float(score)
-
-def _prompt_build_queries(ps: dict) -> str:
-    return f"""
-You are a dataset-finding assistant. Produce a JSON object with a list 'queries' containing 3 short search queries to find public tabular datasets relevant to this problem statement:
-Problem statement: {ps.get('raw_text') or ps}
-Keywords: {ps.get('keywords') or []}
-Return JSON only: {{ "queries": ["...","...","..."] }}
+Priority order:
+1. User-uploaded file
+2. Kaggle API
+3. HuggingFace Datasets
+4. UCI ML Repository
+5. Synthetic generation (fallback)
 """
 
-def find_on_hf(run_id: str, query_list: List[str], max_rows: int = 5000) -> List[dict]:
-    results = []
-    if hf_list_datasets is None or load_dataset is None:
-        agent_log(run_id, "[data_agent] hf libs not available - skipping HF", agent="data_agent")
-        return results
+import os
+import json
+import requests
+import pandas as pd
+import numpy as np
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+from urllib.parse import urljoin
+
+from app.utils.run_logger import agent_log
+from app.utils.llm_clients import llm_generate_json
+
+# Data directory
+DATA_DIR = os.environ.get("DATA_DIR", "data")
+os.makedirs(DATA_DIR, exist_ok=True)
+
+# API credentials
+KAGGLE_USERNAME = os.environ.get("KAGGLE_USERNAME", "")
+KAGGLE_KEY = os.environ.get("KAGGLE_KEY", "")
+HF_TOKEN = os.environ.get("HF_TOKEN", "")
+
+
+# ===============================
+# LLM-GUIDED SEARCH QUERY GENERATION
+# ===============================
+def _generate_search_queries(run_id: str, ps: Dict) -> List[str]:
+    """
+    Use LLM to generate optimal search queries based on problem statement.
+    
+    Returns:
+        List of 3-5 search query strings
+    """
+    prompt = f"""
+You are a dataset search expert. Generate 3-5 search queries to find relevant tabular datasets.
+
+Problem Statement: {ps.get('raw_text', '')}
+Domain: {ps.get('domain', 'general')}
+Keywords: {ps.get('keywords', [])}
+Task Type: {ps.get('task_type', 'classification')}
+
+Return ONLY valid JSON:
+{{
+  "queries": ["query1", "query2", "query3"]
+}}
+
+Make queries specific and relevant to the problem domain.
+"""
+    
     try:
-        ds_list = hf_list_datasets()
+        result = llm_generate_json(prompt, max_tokens=256)
+        if result and "queries" in result:
+            queries = result["queries"][:5]
+            agent_log(run_id, f"[data_agent] LLM generated queries: {queries}", agent="data_agent")
+            return queries
     except Exception as e:
-        agent_log(run_id, f"[data_agent] hf_list_datasets() failed: {e}", agent="data_agent")
-        ds_list = []
+        agent_log(run_id, f"[data_agent] LLM query generation failed: {e}", agent="data_agent", level="WARNING")
+    
+    # Fallback: use keywords and domain
+    fallback_queries = []
+    keywords = ps.get('keywords', [])
+    domain = ps.get('domain', '')
+    task_type = ps.get('task_type', 'classification')
+    
+    if keywords:
+        fallback_queries.append(" ".join(keywords[:3]))
+    if domain:
+        fallback_queries.append(f"{domain} {task_type} dataset")
+    fallback_queries.append(ps.get('raw_text', 'dataset')[:50])
+    
+    return [q for q in fallback_queries if q.strip()][:3]
 
-    candidates = []
-    for q in query_list:
-        if not q or not str(q).strip():
-            continue
-        q_tokens = str(q).lower().split()
-        for entry in ds_list:
-            try:
-                name_str = getattr(entry, "id", None) or getattr(entry, "repo_id", None) or str(entry)
-            except Exception:
-                name_str = str(entry)
-            name_l = name_str.lower() if name_str else ""
-            if all(tok in name_l for tok in q_tokens):
-                candidates.append(name_str)
-            if len(candidates) >= 8:
-                break
-        if len(candidates) >= 8:
-            break
 
-    candidates = list(dict.fromkeys(candidates))[:8]
-
-    for cand in candidates:
-        try:
-            agent_log(run_id, f"[data_agent] attempting HF load: {cand}", agent="data_agent")
-            ds = load_dataset(cand, split=None)
-            if isinstance(ds, DatasetDict):
-                split = "train" if "train" in ds.keys() else list(ds.keys())[0]
-                sub = ds[split]
-            else:
-                sub = ds
-            df = sub.to_pandas()
-            if len(df) > max_rows:
-                df = df.sample(max_rows, random_state=0)
-            safe_name = cand.replace("/", "_").replace(":", "_").replace(" ", "_")
-            path = f"{DATA_DIR}/{run_id}_hf_{safe_name}.csv"
-            df.to_csv(path, index=False)
-            meta = {"name": cand, "uri": cand, "license": "unknown", "est_rows": len(df),
-                    "schema": {"features": list(df.columns), "target": None}, "downloaded_to": path}
-            results.append(meta)
-            agent_log(run_id, f"[data_agent] HF candidate saved: {path}", agent="data_agent")
-        except Exception as e:
-            agent_log(run_id, f"[data_agent] HF candidate skip {cand}: {e}", agent="data_agent")
-            continue
-    return results
-
-def find_on_kaggle(run_id: str, queries: List[str], max_rows: int = 5000) -> List[dict]:
-    results = []
-    if not _have_kaggle or KaggleApi is None:
-        agent_log(run_id, "[data_agent] kaggle not available - skipping", agent="data_agent")
-        return results
+# ===============================
+# KAGGLE INTEGRATION
+# ===============================
+def _search_kaggle(run_id: str, query: str, max_results: int = 5) -> List[Dict]:
+    """
+    Search Kaggle datasets.
+    
+    Returns:
+        List of dataset metadata dicts
+    """
     try:
+        from kaggle.api.kaggle_api_extended import KaggleApi
+        import json
+        from pathlib import Path
+        
+        # Ensure credentials are set up
+        kaggle_username = os.environ.get("KAGGLE_USERNAME")
+        kaggle_key = os.environ.get("KAGGLE_KEY")
+        
+        if kaggle_username and kaggle_key:
+            kaggle_dir = Path.home() / ".kaggle"
+            kaggle_json_path = kaggle_dir / "kaggle.json"
+            
+            if not kaggle_json_path.exists():
+                agent_log(run_id, "[data_agent] Creating Kaggle credentials file", agent="data_agent")
+                kaggle_dir.mkdir(exist_ok=True)
+                credentials = {
+                    "username": kaggle_username,
+                    "key": kaggle_key
+                }
+                with open(kaggle_json_path, 'w') as f:
+                    json.dump(credentials, f, indent=2)
+                try:
+                    os.chmod(kaggle_json_path, 0o600)
+                except:
+                    pass
+        
         api = KaggleApi()
         api.authenticate()
-    except Exception as e:
-        agent_log(run_id, f"[data_agent] Kaggle auth failed: {e}", agent="data_agent")
+        
+        agent_log(run_id, f"[data_agent] 🔍 Searching Kaggle: '{query}'", agent="data_agent")
+        
+        datasets = api.dataset_list(search=query, page=1, max_size=max_results)
+        
+        results = []
+        for ds in datasets:
+            # Get attributes safely (some may not exist)
+            size_bytes = getattr(ds, 'totalBytes', 0) or getattr(ds, 'size', 0)
+            download_count = getattr(ds, 'downloadCount', 0)
+            
+            results.append({
+                "source": "kaggle",
+                "ref": ds.ref,
+                "title": ds.title,
+                "size": size_bytes,
+                "downloads": download_count,
+                "url": f"https://www.kaggle.com/datasets/{ds.ref}"
+            })
+        
+        agent_log(run_id, f"[data_agent] ✅ Found {len(results)} Kaggle datasets for '{query}'", agent="data_agent")
+        if results:
+            for i, r in enumerate(results[:3]):
+                agent_log(run_id, f"[data_agent]    {i+1}. {r['ref']} - {r['title'][:50]}", agent="data_agent")
+        
         return results
-
-    for q in queries:
-        try:
-            search_res = api.datasets_list(search=q, page=1, max_results=10)
-            for ds in search_res:
-                try:
-                    slug = f"{ds.ref}"
-                    agent_log(run_id, f"[data_agent] downloading kaggle dataset {slug}", agent="data_agent")
-                    dest_dir = f"{DATA_DIR}/kaggle_{run_id}"
-                    os.makedirs(dest_dir, exist_ok=True)
-                    api.dataset_download_files(slug, path=dest_dir, unzip=True, quiet=True)
-                    csvs = [str(p) for p in Path(dest_dir).glob("**/*.csv")]
-                    if not csvs:
-                        continue
-                    df = pd.read_csv(csvs[0])
-                    if len(df) > max_rows:
-                        df = df.sample(max_rows, random_state=0)
-                    path = f"{DATA_DIR}/{run_id}_kaggle_{Path(csvs[0]).stem}.csv"
-                    df.to_csv(path, index=False)
-                    meta = {"name": slug, "uri": slug, "license": "unknown", "est_rows": len(df),
-                            "schema": {"features": list(df.columns), "target": None}, "downloaded_to": path}
-                    results.append(meta)
-                    agent_log(run_id, f"[data_agent] Kaggle candidate saved: {path}", agent="data_agent")
-                except Exception as e:
-                    agent_log(run_id, f"[data_agent] Kaggle candidate skip: {e}", agent="data_agent")
-        except Exception as e:
-            agent_log(run_id, f"[data_agent] Kaggle search error for '{q}': {e}", agent="data_agent")
-
-    return results
-
-def ddg_search_links(query: str, max_results: int = 6) -> List[str]:
-    try:
-        url = "https://duckduckgo.com/html/"
-        r = requests.post(url, data={"q": query}, timeout=10, headers={"User-Agent":"Mozilla/5.0"})
-        soup = BeautifulSoup(r.text, "html.parser")
-        links = []
-        for a in soup.find_all("a", href=True):
-            href = a["href"]
-            if href.startswith("/l/?kh="):
-                from urllib.parse import parse_qs, urlparse, unquote
-                qs = parse_qs(urlparse(href).query)
-                if "uddg" in qs:
-                    links.append(unquote(qs["uddg"][0])); continue
-            if href.startswith("http"): links.append(href)
-            if len(links) >= max_results: break
-        return links
-    except Exception:
+        
+    except ImportError:
+        agent_log(run_id, "[data_agent] ❌ Kaggle library not installed", agent="data_agent", level="WARNING")
+        return []
+    except Exception as e:
+        agent_log(run_id, f"[data_agent] ❌ Kaggle search failed: {e}", agent="data_agent", level="ERROR")
+        import traceback
+        agent_log(run_id, f"[data_agent] Traceback: {traceback.format_exc()}", agent="data_agent", level="ERROR")
         return []
 
-def try_scrape_tabular(run_id: str, url: str, max_rows: int = 5000) -> Optional[dict]:
+
+def _download_kaggle_dataset(run_id: str, dataset_ref: str) -> Optional[str]:
+    """
+    Download Kaggle dataset and return path to CSV file.
+    
+    Args:
+        run_id: Run identifier
+        dataset_ref: Kaggle dataset reference (e.g., "username/dataset-name")
+    
+    Returns:
+        Path to downloaded CSV file or None
+    """
     try:
-        agent_log(run_id, f"[data_agent] attempting web scrape: {url}", agent="data_agent")
-        r = requests.get(url, timeout=12, headers={"User-Agent":"Mozilla/5.0"})
-        if r.status_code != 200: return None
-        content_type = r.headers.get("content-type","").lower()
-        if url.lower().endswith(".csv") or "text/csv" in content_type:
-            txt = r.content.decode("utf-8", errors="replace")
-            df = pd.read_csv(io.StringIO(txt))
-            if len(df) > max_rows: df = df.sample(max_rows, random_state=0)
-            fname = f"{DATA_DIR}/{run_id}_web_csv.csv"
-            df.to_csv(fname, index=False)
-            return {"name": url, "uri": url, "license": "unknown", "est_rows": len(df),
-                    "schema":{"features":list(df.columns),"target":None}, "downloaded_to": fname}
-        soup = BeautifulSoup(r.text, "html.parser")
-        tables = soup.find_all("table")
-        if not tables: return None
-        for i, tbl in enumerate(tables):
-            try:
-                df_list = pd.read_html(str(tbl))
-                if not df_list: continue
-                df = df_list[0]
-                if df.shape[0]==0 or df.shape[1]==0: continue
-                if len(df) > max_rows: df = df.sample(max_rows, random_state=0)
-                fname = f"{DATA_DIR}/{run_id}_web_table_{i}.csv"
-                df.to_csv(fname, index=False)
-                return {"name": url, "uri": url, "license": "unknown", "est_rows": len(df),
-                        "schema":{"features":list(df.columns),"target":None}, "downloaded_to": fname}
-            except Exception:
-                continue
+        from kaggle.api.kaggle_api_extended import KaggleApi
+        
+        api = KaggleApi()
+        api.authenticate()
+        
+        out_dir = os.path.join(DATA_DIR, f"{run_id}_kaggle_{dataset_ref.replace('/', '_')}")
+        os.makedirs(out_dir, exist_ok=True)
+        
+        agent_log(run_id, f"[data_agent] 📥 Downloading Kaggle dataset: {dataset_ref}", agent="data_agent")
+        
+        # Download with error handling
+        try:
+            api.dataset_download_files(dataset_ref, path=out_dir, unzip=True, quiet=False)
+        except Exception as download_error:
+            agent_log(run_id, f"[data_agent] Download error: {download_error}", agent="data_agent", level="ERROR")
+            return None
+        
+        # Find CSV files
+        csv_files = list(Path(out_dir).glob("**/*.csv"))
+        
+        if not csv_files:
+            # List what files we got
+            all_files = list(Path(out_dir).glob("**/*"))
+            file_names = [f.name for f in all_files if f.is_file()]
+            agent_log(run_id, f"[data_agent] ⚠️ No CSV files found in {dataset_ref}", agent="data_agent", level="WARNING")
+            agent_log(run_id, f"[data_agent] Files found: {', '.join(file_names[:10])}", agent="data_agent", level="WARNING")
+            return None
+        
+        # Return the largest CSV file
+        largest_csv = max(csv_files, key=lambda p: p.stat().st_size)
+        csv_path = str(largest_csv)
+        
+        # Validate CSV
+        try:
+            df = pd.read_csv(csv_path, nrows=5)
+            file_size = largest_csv.stat().st_size
+            agent_log(run_id, f"[data_agent] ✅ Kaggle dataset downloaded: {csv_path}", agent="data_agent")
+            agent_log(run_id, f"[data_agent]    File: {largest_csv.name} ({file_size} bytes, {len(df.columns)} columns)", agent="data_agent")
+            return csv_path
+        except Exception as e:
+            agent_log(run_id, f"[data_agent] ❌ Invalid CSV file: {e}", agent="data_agent", level="ERROR")
+            return None
+            
+    except Exception as e:
+        agent_log(run_id, f"[data_agent] ❌ Kaggle download failed: {e}", agent="data_agent", level="ERROR")
+        import traceback
+        agent_log(run_id, f"[data_agent] Traceback: {traceback.format_exc()}", agent="data_agent", level="ERROR")
         return None
+
+
+# ===============================
+# HUGGINGFACE INTEGRATION
+# ===============================
+def _search_huggingface(run_id: str, query: str, max_results: int = 5) -> List[Dict]:
+    """
+    Search HuggingFace datasets.
+    
+    Returns:
+        List of dataset metadata dicts
+    """
+    try:
+        from huggingface_hub import list_datasets
+        
+        agent_log(run_id, f"[data_agent] Searching HuggingFace: '{query}'", agent="data_agent")
+        
+        # Search datasets
+        datasets = list(list_datasets(search=query, limit=max_results))
+        
+        results = []
+        for ds in datasets:
+            dataset_id = ds.id if hasattr(ds, 'id') else str(ds)
+            results.append({
+                "source": "huggingface",
+                "id": dataset_id,
+                "url": f"https://huggingface.co/datasets/{dataset_id}"
+            })
+        
+        agent_log(run_id, f"[data_agent] Found {len(results)} HuggingFace datasets", agent="data_agent")
+        return results
+        
+    except ImportError:
+        agent_log(run_id, "[data_agent] HuggingFace hub not installed", agent="data_agent", level="WARNING")
+        return []
     except Exception as e:
-        agent_log(run_id, f"[data_agent] web scrape failed for {url}: {e}", agent="data_agent")
+        agent_log(run_id, f"[data_agent] HuggingFace search failed: {e}", agent="data_agent", level="ERROR")
+        return []
+
+
+def _download_huggingface_dataset(run_id: str, dataset_id: str, max_rows: int = 50000) -> Optional[str]:
+    """
+    Download HuggingFace dataset and convert to CSV.
+    
+    Args:
+        run_id: Run identifier
+        dataset_id: HuggingFace dataset ID
+        max_rows: Maximum rows to download
+    
+    Returns:
+        Path to CSV file or None
+    """
+    try:
+        from datasets import load_dataset
+        
+        agent_log(run_id, f"[data_agent] Loading HuggingFace dataset: {dataset_id}", agent="data_agent")
+        
+        # Load dataset
+        dataset = load_dataset(dataset_id, split="train")
+        
+        # Convert to pandas
+        df = dataset.to_pandas()
+        
+        # Limit rows
+        if len(df) > max_rows:
+            agent_log(run_id, f"[data_agent] Sampling {max_rows} rows from {len(df)}", agent="data_agent")
+            df = df.sample(n=max_rows, random_state=42)
+        
+        # Save to CSV
+        safe_name = dataset_id.replace("/", "_").replace(":", "_")
+        csv_path = os.path.join(DATA_DIR, f"{run_id}_hf_{safe_name}.csv")
+        df.to_csv(csv_path, index=False)
+        
+        agent_log(run_id, f"[data_agent] HuggingFace dataset saved: {csv_path} ({len(df)} rows, {len(df.columns)} columns)", agent="data_agent")
+        return csv_path
+        
+    except Exception as e:
+        agent_log(run_id, f"[data_agent] HuggingFace download failed: {e}", agent="data_agent", level="ERROR")
         return None
 
-def get_or_find_dataset(run_id: str, ps: dict, user: dict, min_rows: int = 500) -> str:
-    agent_log(run_id, f"[data_agent] start. user keys: {list(user.keys()) if isinstance(user, dict) else user}", agent="data_agent")
 
-    if user and isinstance(user, dict) and user.get("upload_path"):
-        path = user["upload_path"]
-        if not Path(path).exists():
-            raise FileNotFoundError(f"Provided upload_path not found: {path}")
-        agent_log(run_id, f"[data_agent] using user-provided upload_path: {path}", agent="data_agent")
-        return path
+# ===============================
+# UCI ML REPOSITORY INTEGRATION
+# ===============================
+def _search_uci(run_id: str, query: str) -> List[Dict]:
+    """
+    Search UCI ML Repository (simplified - uses keyword matching).
+    
+    Returns:
+        List of dataset metadata dicts
+    """
+    # UCI dataset catalog (subset of popular datasets)
+    UCI_DATASETS = {
+        "iris": "https://archive.ics.uci.edu/ml/machine-learning-databases/iris/iris.data",
+        "wine": "https://archive.ics.uci.edu/ml/machine-learning-databases/wine/wine.data",
+        "breast cancer": "https://archive.ics.uci.edu/ml/machine-learning-databases/breast-cancer-wisconsin/wdbc.data",
+        "adult": "https://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.data",
+        "diabetes": "https://archive.ics.uci.edu/ml/machine-learning-databases/00296/dataset_diabetes.zip",
+        "heart": "https://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease/processed.cleveland.data",
+        "credit": "https://archive.ics.uci.edu/ml/machine-learning-databases/credit-screening/crx.data",
+    }
+    
+    query_lower = query.lower()
+    results = []
+    
+    for name, url in UCI_DATASETS.items():
+        if any(word in name for word in query_lower.split()):
+            results.append({
+                "source": "uci",
+                "name": name,
+                "url": url
+            })
+    
+    agent_log(run_id, f"[data_agent] Found {len(results)} UCI datasets matching '{query}'", agent="data_agent")
+    return results
 
-    # Build queries using LLM
+
+def _download_uci_dataset(run_id: str, dataset_url: str, dataset_name: str) -> Optional[str]:
+    """
+    Download UCI dataset.
+    
+    Args:
+        run_id: Run identifier
+        dataset_url: URL to dataset
+        dataset_name: Name of dataset
+    
+    Returns:
+        Path to CSV file or None
+    """
     try:
-        prompt = _prompt_build_queries(ps)
-        qjson = llm_generate_json(prompt) or {}
-        queries = qjson.get("queries", [])[:3]
+        agent_log(run_id, f"[data_agent] Downloading UCI dataset: {dataset_name}", agent="data_agent")
+        
+        response = requests.get(dataset_url, timeout=30)
+        response.raise_for_status()
+        
+        # Save to CSV
+        csv_path = os.path.join(DATA_DIR, f"{run_id}_uci_{dataset_name.replace(' ', '_')}.csv")
+        
+        # Try to parse as CSV
+        from io import StringIO
+        df = pd.read_csv(StringIO(response.text), header=None)
+        df.to_csv(csv_path, index=False)
+        
+        agent_log(run_id, f"[data_agent] UCI dataset saved: {csv_path} ({len(df)} rows)", agent="data_agent")
+        return csv_path
+        
     except Exception as e:
-        agent_log(run_id, f"[data_agent] LLM query generation failed: {e}", agent="data_agent")
-        queries = []
+        agent_log(run_id, f"[data_agent] UCI download failed: {e}", agent="data_agent", level="ERROR")
+        return None
 
-    if not queries:
-        keywords = ps.get("keywords") or [ps.get("domain","")]
-        queries = [
-            " ".join(keywords) if isinstance(keywords, list) else str(keywords),
-            ps.get("raw_text",""),
-            "public tabular dataset " + (ps.get("domain","") or "")
-        ]
-    queries = [q for q in queries if q and str(q).strip()][:3]
-    agent_log(run_id, f"[data_agent] queries: {queries}", agent="data_agent")
 
-    # Try HF
-    hf_candidates = find_on_hf(run_id, queries, max_rows=5000)
-    for c in hf_candidates: c["quality_score"] = _score_candidate(c, ps)
-    hf_sorted = sorted(hf_candidates, key=lambda x: x.get("quality_score",0), reverse=True)
-    for cand in hf_sorted:
-        if cand.get("est_rows", 0) >= min_rows:
-            agent_log(run_id, f"[data_agent] selected HF candidate {cand['downloaded_to']}", agent="data_agent")
-            return cand["downloaded_to"]
-    if hf_sorted:
-        agent_log(run_id, f"[data_agent] no HF >= min_rows; returning best HF candidate {hf_sorted[0]['downloaded_to']}", agent="data_agent")
-        return hf_sorted[0]["downloaded_to"]
+# ===============================
+# SYNTHETIC DATA GENERATION
+# ===============================
+def _generate_synthetic_dataset(run_id: str, ps: Dict, n_rows: int = 2000) -> str:
+    """
+    Generate synthetic tabular dataset using LLM-guided schema.
+    
+    Args:
+        run_id: Run identifier
+        ps: Problem statement dict
+        n_rows: Number of rows to generate
+    
+    Returns:
+        Path to generated CSV file
+    """
+    agent_log(run_id, "[data_agent] Generating synthetic dataset", agent="data_agent")
+    
+    # Ask LLM for schema
+    prompt = f"""
+You are a synthetic data generator. Create a schema for a tabular dataset.
 
-    # Try Kaggle
-    kag_candidates = find_on_kaggle(run_id, queries, max_rows=5000)
-    for c in kag_candidates: c["quality_score"] = _score_candidate(c, ps)
-    kag_sorted = sorted(kag_candidates, key=lambda x: x.get("quality_score",0), reverse=True)
-    for cand in kag_sorted:
-        if cand.get("est_rows", 0) >= min_rows:
-            agent_log(run_id, f"[data_agent] selected Kaggle candidate {cand['downloaded_to']}", agent="data_agent")
-            return cand["downloaded_to"]
-    if kag_sorted:
-        agent_log(run_id, f"[data_agent] returning best Kaggle candidate {kag_sorted[0]['downloaded_to']}", agent="data_agent")
-        return kag_sorted[0]["downloaded_to"]
+Problem: {ps.get('raw_text', '')}
+Task Type: {ps.get('task_type', 'classification')}
+Domain: {ps.get('domain', 'general')}
 
-    # Web scraping
-    web_candidates = []
+Return ONLY valid JSON with this structure:
+{{
+  "columns": [
+    {{"name": "age", "type": "int", "min": 18, "max": 80}},
+    {{"name": "income", "type": "float", "min": 20000, "max": 150000}},
+    {{"name": "category", "type": "categorical", "values": ["A", "B", "C"]}}
+  ],
+  "target": {{"name": "target", "type": "binary"}}
+}}
+
+Include 5-10 relevant features for the problem.
+"""
+    
     try:
-        web_candidates = []
-        for q in queries:
-            links = ddg_search_links(q, max_results=6)
-            for url in links:
-                m = try_scrape_tabular(run_id, url, max_rows=5000)
-                if m:
-                    web_candidates.append(m)
-                    if len(web_candidates) >= 3: break
-            if len(web_candidates) >= 3: break
+        schema = llm_generate_json(prompt, max_tokens=512)
+        if not schema or "columns" not in schema:
+            raise ValueError("Invalid schema from LLM")
     except Exception as e:
-        agent_log(run_id, f"[data_agent] web search error: {e}", agent="data_agent")
-
-    for c in web_candidates: c["quality_score"] = _score_candidate(c, ps)
-    web_sorted = sorted(web_candidates, key=lambda x: x.get("quality_score",0), reverse=True)
-    for cand in web_sorted:
-        if cand.get("est_rows", 0) >= min_rows:
-            agent_log(run_id, f"[data_agent] selected Web candidate {cand['downloaded_to']}", agent="data_agent")
-            return cand["downloaded_to"]
-    if web_sorted:
-        agent_log(run_id, f"[data_agent] returning best Web candidate {web_sorted[0]['downloaded_to']}", agent="data_agent")
-        return web_sorted[0]["downloaded_to"]
-
-    # Fallback synthetic
-    allow_synth = (ps.get("plan",{}).get("allow_synthetic") or ps.get("constraints",{}).get("allow_synthetic") or True)
-    if allow_synth:
-        agent_log(run_id, "[data_agent] No public dataset found; generating synthetic dataset.", agent="data_agent")
-        schema_hint = ps.get("schema_hint") or {
-            "rows": 2000,
+        agent_log(run_id, f"[data_agent] LLM schema generation failed: {e}, using default", agent="data_agent", level="WARNING")
+        # Default schema
+        schema = {
             "columns": [
-                {"name":"age","type":"int","range":[18,80]},
-                {"name":"income","type":"float","range":[1000,100000]},
-                {"name":"utilization","type":"float","range":[0,1]},
-                {"name":"default_flag","type":"binary","imbalance_ratio":0.2}
-            ]
+                {"name": "feature1", "type": "float", "min": 0, "max": 1},
+                {"name": "feature2", "type": "int", "min": 1, "max": 100},
+                {"name": "feature3", "type": "float", "min": -10, "max": 10},
+                {"name": "feature4", "type": "categorical", "values": ["A", "B", "C", "D"]},
+            ],
+            "target": {"name": "target", "type": "binary"}
         }
-        from .synthetic_agent import synthesize_dataset
-        synth_uri = synthesize_dataset(run_id, schema_hint)
-        if isinstance(synth_uri, dict):
-            return synth_uri.get("dataset_uri")
-        return synth_uri
+    
+    # Generate data
+    data = {}
+    
+    for col in schema.get("columns", []):
+        col_name = col["name"]
+        col_type = col["type"]
+        
+        if col_type == "int":
+            data[col_name] = np.random.randint(col.get("min", 0), col.get("max", 100), n_rows)
+        elif col_type == "float":
+            data[col_name] = np.random.uniform(col.get("min", 0), col.get("max", 1), n_rows)
+        elif col_type == "categorical":
+            values = col.get("values", ["A", "B", "C"])
+            data[col_name] = np.random.choice(values, n_rows)
+    
+    # Generate target
+    target_info = schema.get("target", {"name": "target", "type": "binary"})
+    target_name = target_info["name"]
+    target_type = target_info["type"]
+    
+    if target_type == "binary":
+        data[target_name] = np.random.randint(0, 2, n_rows)
+    elif target_type == "multiclass":
+        n_classes = target_info.get("n_classes", 3)
+        data[target_name] = np.random.randint(0, n_classes, n_rows)
+    else:  # regression
+        data[target_name] = np.random.randn(n_rows)
+    
+    # Create DataFrame
+    df = pd.DataFrame(data)
+    
+    # Save to CSV
+    csv_path = os.path.join(DATA_DIR, f"{run_id}_synthetic.csv")
+    df.to_csv(csv_path, index=False)
+    
+    agent_log(run_id, f"[data_agent] Synthetic dataset generated: {csv_path} ({len(df)} rows, {len(df.columns)} columns)", agent="data_agent")
+    return csv_path
 
-    raise RuntimeError("No dataset found and synthetic not allowed.")
+
+# ===============================
+# DATASET VALIDATION
+# ===============================
+def _validate_dataset(run_id: str, csv_path: str, min_rows: int = 50, min_cols: int = 2) -> Tuple[bool, Dict]:
+    """
+    Validate dataset meets minimum requirements.
+    
+    Returns:
+        (is_valid, summary_dict)
+    """
+    try:
+        df = pd.read_csv(csv_path, nrows=100)
+        
+        n_rows_sample = len(df)
+        n_cols = len(df.columns)
+        
+        # Check full row count
+        with open(csv_path, 'r') as f:
+            n_rows = sum(1 for _ in f) - 1  # Subtract header
+        
+        summary = {
+            "n_rows": n_rows,
+            "n_cols": n_cols,
+            "columns": list(df.columns),
+            "dtypes": {col: str(dtype) for col, dtype in df.dtypes.items()},
+            "missing_pct": {col: float(df[col].isna().mean()) for col in df.columns},
+            "path": csv_path
+        }
+        
+        is_valid = n_rows >= min_rows and n_cols >= min_cols
+        
+        if is_valid:
+            agent_log(run_id, f"[data_agent] Dataset validated: {n_rows} rows, {n_cols} columns", agent="data_agent")
+        else:
+            agent_log(run_id, f"[data_agent] Dataset validation failed: {n_rows} rows, {n_cols} columns", agent="data_agent", level="WARNING")
+        
+        return is_valid, summary
+        
+    except Exception as e:
+        agent_log(run_id, f"[data_agent] Dataset validation error: {e}", agent="data_agent", level="ERROR")
+        return False, {}
+
+
+# ===============================
+# MAIN ORCHESTRATION FUNCTION
+# ===============================
+def get_or_find_dataset(run_id: str, ps: Dict, user: Dict) -> Dict:
+    """
+    Main entry point for data acquisition.
+    
+    Tries sources in priority order:
+    1. User-uploaded file
+    2. Kaggle
+    3. HuggingFace
+    4. UCI ML Repository
+    5. Synthetic generation (fallback)
+    
+    Args:
+        run_id: Unique run identifier
+        ps: Problem statement dict
+        user: User payload dict (may contain upload_path)
+    
+    Returns:
+        Dict with dataset_path, source, and source_name
+    """
+    agent_log(run_id, "[data_agent] Starting dataset acquisition", agent="data_agent")
+    
+    print(f"\n{'='*60}")
+    print(f"🔍 SEARCHING FOR DATASETS")
+    print(f"   Problem: {ps.get('raw_text', 'N/A')[:50]}...")
+    print(f"   Task Type: {ps.get('task_type', 'unknown')}")
+    print(f"   Domain: {ps.get('domain', 'general')}")
+    print(f"\n   Search Order:")
+    print(f"   1. User Upload")
+    print(f"   2. Kaggle")
+    print(f"   3. HuggingFace")
+    print(f"   4. UCI ML Repository")
+    print(f"   5. Synthetic (fallback)")
+    print(f"{'='*60}\n")
+    
+    # ===== 1. USER-UPLOADED FILE =====
+    if user and user.get("upload_path"):
+        upload_path = user["upload_path"]
+        agent_log(run_id, f"[data_agent] Using user-uploaded file: {upload_path}", agent="data_agent")
+        
+        if os.path.exists(upload_path):
+            is_valid, summary = _validate_dataset(run_id, upload_path)
+            if is_valid:
+                print(f"\n{'='*60}")
+                print(f"✅ DATASET SELECTED: User Upload")
+                print(f"   File: {upload_path}")
+                print(f"   Rows: {summary.get('n_rows', 'unknown')}")
+                print(f"   Columns: {summary.get('n_cols', 'unknown')}")
+                print(f"{'='*60}\n")
+                agent_log(run_id, f"[data_agent] ✅ USING USER-UPLOADED FILE: {upload_path} ({summary.get('n_rows')} rows, {summary.get('n_cols')} cols)", agent="data_agent")
+                return {
+                    "dataset_path": upload_path,
+                    "source": "User Upload",
+                    "source_name": os.path.basename(upload_path)
+                }
+            else:
+                agent_log(run_id, "[data_agent] User file invalid, trying other sources", agent="data_agent", level="WARNING")
+        else:
+            agent_log(run_id, f"[data_agent] User file not found: {upload_path}", agent="data_agent", level="ERROR")
+    
+    # Generate search queries
+    queries = _generate_search_queries(run_id, ps)
+    agent_log(run_id, f"[data_agent] Search queries: {queries}", agent="data_agent")
+    
+    # Add well-known public datasets as fallback based on task type
+    task_type = ps.get('task_type', 'classification')
+    domain = ps.get('domain', '').lower()
+    
+    # Known good public datasets on Kaggle
+    known_datasets = []
+    if 'iris' in domain or 'flower' in domain:
+        known_datasets.append('uciml/iris')
+    if 'diabetes' in domain or 'health' in domain:
+        known_datasets.append('uciml/pima-indians-diabetes-database')
+    if 'cancer' in domain or 'breast' in domain:
+        known_datasets.append('uciml/breast-cancer-wisconsin-data')
+    if 'wine' in domain:
+        known_datasets.append('uciml/red-wine-quality-cortez-et-al-2009')
+    
+    # ===== 2. KAGGLE =====
+    # First try search results
+    for query in queries:
+        try:
+            kaggle_results = _search_kaggle(run_id, query, max_results=3)
+            for result in kaggle_results:
+                csv_path = _download_kaggle_dataset(run_id, result["ref"])
+                if csv_path:
+                    is_valid, summary = _validate_dataset(run_id, csv_path)
+                    if is_valid:
+                        print(f"\n{'='*60}")
+                        print(f"✅ DATASET SELECTED: Kaggle")
+                        print(f"   Dataset: {result['ref']}")
+                        print(f"   Rows: {summary.get('n_rows', 'unknown')}")
+                        print(f"   Columns: {summary.get('n_cols', 'unknown')}")
+                        print(f"   Path: {csv_path}")
+                        print(f"{'='*60}\n")
+                        agent_log(run_id, f"[data_agent] ✅ SELECTED KAGGLE DATASET: {result['ref']} ({summary.get('n_rows')} rows, {summary.get('n_cols')} cols)", agent="data_agent")
+                        return {
+                            "dataset_path": csv_path,
+                            "source": "Kaggle",
+                            "source_name": result['ref'],
+                            "source_url": result.get('url', '')
+                        }
+        except Exception as e:
+            agent_log(run_id, f"[data_agent] Kaggle attempt failed: {e}", agent="data_agent", level="WARNING")
+            continue
+    
+    # Try known public datasets as fallback
+    if known_datasets:
+        agent_log(run_id, f"[data_agent] Trying known public datasets: {known_datasets}", agent="data_agent")
+        for dataset_ref in known_datasets:
+            try:
+                csv_path = _download_kaggle_dataset(run_id, dataset_ref)
+                if csv_path:
+                    is_valid, summary = _validate_dataset(run_id, csv_path)
+                    if is_valid:
+                        print(f"\n{'='*60}")
+                        print(f"✅ DATASET SELECTED: Kaggle (Known Public Dataset)")
+                        print(f"   Dataset: {dataset_ref}")
+                        print(f"   Rows: {summary.get('n_rows', 'unknown')}")
+                        print(f"   Columns: {summary.get('n_cols', 'unknown')}")
+                        print(f"   Path: {csv_path}")
+                        print(f"{'='*60}\n")
+                        agent_log(run_id, f"[data_agent] ✅ SELECTED KAGGLE DATASET: {dataset_ref} ({summary.get('n_rows')} rows, {summary.get('n_cols')} cols)", agent="data_agent")
+                        return {
+                            "dataset_path": csv_path,
+                            "source": "Kaggle",
+                            "source_name": dataset_ref,
+                            "source_url": f"https://www.kaggle.com/datasets/{dataset_ref}"
+                        }
+            except Exception as e:
+                agent_log(run_id, f"[data_agent] Known dataset {dataset_ref} failed: {e}", agent="data_agent", level="WARNING")
+                continue
+    
+    # ===== 3. HUGGINGFACE =====
+    for query in queries:
+        try:
+            hf_results = _search_huggingface(run_id, query, max_results=3)
+            for result in hf_results:
+                csv_path = _download_huggingface_dataset(run_id, result["id"])
+                if csv_path:
+                    is_valid, summary = _validate_dataset(run_id, csv_path)
+                    if is_valid:
+                        print(f"\n{'='*60}")
+                        print(f"✅ DATASET SELECTED: HuggingFace")
+                        print(f"   Dataset: {result['id']}")
+                        print(f"   Rows: {summary.get('n_rows', 'unknown')}")
+                        print(f"   Columns: {summary.get('n_cols', 'unknown')}")
+                        print(f"   Path: {csv_path}")
+                        print(f"{'='*60}\n")
+                        agent_log(run_id, f"[data_agent] ✅ SELECTED HUGGINGFACE DATASET: {result['id']} ({summary.get('n_rows')} rows, {summary.get('n_cols')} cols)", agent="data_agent")
+                        return {
+                            "dataset_path": csv_path,
+                            "source": "HuggingFace",
+                            "source_name": result['id'],
+                            "source_url": result.get('url', '')
+                        }
+        except Exception as e:
+            agent_log(run_id, f"[data_agent] HuggingFace attempt failed: {e}", agent="data_agent", level="WARNING")
+            continue
+    
+    # ===== 4. UCI ML REPOSITORY =====
+    for query in queries:
+        try:
+            uci_results = _search_uci(run_id, query)
+            for result in uci_results:
+                csv_path = _download_uci_dataset(run_id, result["url"], result["name"])
+                if csv_path:
+                    is_valid, summary = _validate_dataset(run_id, csv_path)
+                    if is_valid:
+                        print(f"\n{'='*60}")
+                        print(f"✅ DATASET SELECTED: UCI ML Repository")
+                        print(f"   Dataset: {result['name']}")
+                        print(f"   Rows: {summary.get('n_rows', 'unknown')}")
+                        print(f"   Columns: {summary.get('n_cols', 'unknown')}")
+                        print(f"   Path: {csv_path}")
+                        print(f"{'='*60}\n")
+                        agent_log(run_id, f"[data_agent] ✅ SELECTED UCI DATASET: {result['name']} ({summary.get('n_rows')} rows, {summary.get('n_cols')} cols)", agent="data_agent")
+                        return {
+                            "dataset_path": csv_path,
+                            "source": "UCI ML Repository",
+                            "source_name": result['name'],
+                            "source_url": result.get('url', '')
+                        }
+        except Exception as e:
+            agent_log(run_id, f"[data_agent] UCI attempt failed: {e}", agent="data_agent", level="WARNING")
+            continue
+    
+    # ===== 5. SYNTHETIC GENERATION (FALLBACK) =====
+    print(f"\n{'='*60}")
+    print(f"⚠️  FALLBACK: Generating Synthetic Dataset")
+    print(f"   Reason: No suitable datasets found from external sources")
+    print(f"{'='*60}\n")
+    agent_log(run_id, "[data_agent] ⚠️ All external sources failed, generating synthetic dataset", agent="data_agent", level="WARNING")
+    
+    n_rows = int(os.environ.get("SYNTHETIC_DEFAULT_ROWS", "2000"))
+    csv_path = _generate_synthetic_dataset(run_id, ps, n_rows=n_rows)
+    
+    # Get summary for synthetic data
+    is_valid, summary = _validate_dataset(run_id, csv_path)
+    
+    print(f"\n{'='*60}")
+    print(f"✅ DATASET GENERATED: Synthetic")
+    print(f"   Rows: {summary.get('n_rows', n_rows)}")
+    print(f"   Columns: {summary.get('n_cols', 'unknown')}")
+    print(f"   Path: {csv_path}")
+    print(f"{'='*60}\n")
+    
+    return {
+        "dataset_path": csv_path,
+        "source": "Synthetic (Generated)",
+        "source_name": f"Generated for: {ps.get('raw_text', 'ML Task')[:50]}"
+    }

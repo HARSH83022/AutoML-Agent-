@@ -1,2 +1,0 @@
-[2025-11-19 00:15:32] [INFO] [automl_agent] start task=classification models=['xgboost', 'lgbm', 'rf'] metric=f1
-[2025-11-19 00:17:33] [INFO] [automl_agent] finished. model=artifacts/e1d7eced-5c03-49cb-a0a0-9130f03e3847_best_model.pkl
