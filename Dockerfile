@@ -88,12 +88,12 @@ COPY --from=frontend-builder /app/frontend/dist ./app/static
 
 RUN mkdir -p artifacts data
 
-COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+COPY start.py /app/start.py
+RUN chmod +x /app/start.py
 
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD python -c "import requests; requests.get('http://localhost:8000/health')"
 
-ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["python", "start.py"]
