@@ -1,22 +1,18 @@
-# Multi-stage build for production
-
 # Stage 1: Build Frontend
 FROM node:18-alpine AS frontend-builder
 
 WORKDIR /app/frontend
 
-# Copy package files and install dependencies
 COPY frontend/package*.json ./
-RUN npm install
 
-# Copy full frontend source
+RUN npm install && npm install -g vite
+
 COPY frontend/ ./
 
-# Fix permission issue for vite binary
 RUN chmod -R 755 /app/frontend/node_modules
 
-# Build frontend
 RUN npm run build
+
 
 # Stage 2: Python Backend
 FROM python:3.10-slim
