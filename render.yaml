@@ -5,14 +5,16 @@ services:
     plan: free
     branch: Phase-4
     buildCommand: |
-      python --version
-      ls -la
       pip install --upgrade pip
       pip install -r requirements.txt
-      cd frontend && npm install && npm run build && cd ..
+      cd frontend
+      npm install
+      npm run build
+      cd ..
       mkdir -p app/static
-      cp -r frontend/dist/* app/static/
-    startCommand: gunicorn -w 2 -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:$PORT --timeout 600 --max-requests 1000 --max-requests-jitter 50
+      if [ -d "frontend/dist" ]; then cp -r frontend/dist/* app/static/; echo "Frontend copied successfully"; else echo "Frontend dist not found"; fi
+      ls -la app/static
+    startCommand: gunicorn -w 2 -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:$PORT --timeout 600
     envVars:
       # Application Settings
       - key: APP_ENV
