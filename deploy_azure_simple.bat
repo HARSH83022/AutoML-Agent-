@@ -72,10 +72,10 @@ az webapp config appsettings set ^
   --settings ^
     APP_ENV=production ^
     LOG_LEVEL=info ^
-    KAGGLE_USERNAME=ramyasharma10 ^
-    KAGGLE_KEY=820ef1deeb71e11c4494e16cd071e921 ^
-    LLM_MODE=ollama ^
-    OLLAMA_URL=http://localhost:11434/api/generate ^
+    KAGGLE_USERNAME=harsh83022 ^
+    KAGGLE_KEY=04bd6ce5bcb813d98f2a83457af5c44a ^
+    LLM_MODE=none ^
+    SYNTHETIC_DEFAULT_ROWS=1000 ^
   --output none
 
 echo ✅ Environment variables configured
