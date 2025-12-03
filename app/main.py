@@ -787,6 +787,16 @@ def init_db():
 init_db()
 app = FastAPI(title="AutoML Orchestrator")
 
+# Add CORS middleware for frontend-backend communication
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins for Railway deployment
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.get("/checkllm")
 def check_llm():
