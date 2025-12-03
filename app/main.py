@@ -743,7 +743,9 @@ import traceback
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, Optional
 
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, HTTPException, Body, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from fastapi.responses import HTMLResponse, FileResponse
 
@@ -757,14 +759,20 @@ from app.agents.automl_agent import run_automl
 from app.agents.eval_agent import evaluate_model
 
 from app.dashboard_html import DASHBOARD_HTML
+from app.config import Config
+from app.logging_config import get_logger, log_error
+
+# Initialize logger
+logger = get_logger(__name__)
 
 ensure_dirs()
 
-DB = os.getenv("DB_PATH", "runs.db")
-ARTIFACT_DIR = os.getenv("ARTIFACT_DIR", "artifacts")
+# Use configuration from Config class
+DB = Config.DB_PATH
+ARTIFACT_DIR = Config.ARTIFACT_DIR
 os.makedirs(ARTIFACT_DIR, exist_ok=True)
 
-executor = ThreadPoolExecutor(max_workers=int(os.getenv("THREAD_POOL_SIZE", "2")))
+executor = ThreadPoolExecutor(max_workers=Config.THREAD_POOL_SIZE)
 MAX_STEP_RETRIES = 1
 STEP_RETRY_BACKOFF = 2
 
@@ -785,7 +793,85 @@ def init_db():
 
 
 init_db()
-app = FastAPI(title="AutoML Orchestrator")
+app = FastAPI(
+    title="AutoML Orchestrator",
+    version="1.0.0",
+    description="Automated Machine Learning Pipeline Orchestrator"
+)
+
+# Add CORS middleware for frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, specify exact origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# ----------------------
+# Global Error Handlers
+# ----------------------
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """
+    Handle HTTP exceptions with proper logging and sanitized responses
+    """
+    logger.warning(f"HTTP {exc.status_code}: {exc.detail} - Path: {request.url.path}")
+    return {
+        "error": exc.detail,
+        "status_code": exc.status_code,
+        "path": str(request.url.path)
+    }
+
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    """
+    Handle unexpected exceptions with logging and safe error messages
+    """
+    # Log the full error with context
+    log_error(exc, context={
+        "path": str(request.url.path),
+        "method": request.method,
+    })
+    
+    # Return safe error message (don't expose internal details)
+    if Config.DEBUG:
+        error_detail = str(exc)
+    else:
+        error_detail = "An internal error occurred. Please try again later."
+    
+    return {
+        "error": error_detail,
+        "status_code": 500,
+        "path": str(request.url.path)
+    }
+
+
+@app.exception_handler(ValueError)
+async def value_error_handler(request: Request, exc: ValueError):
+    """
+    Handle validation errors (400 Bad Request)
+    """
+    logger.warning(f"Validation error: {str(exc)} - Path: {request.url.path}")
+    return {
+        "error": f"Invalid input: {str(exc)}",
+        "status_code": 400,
+        "path": str(request.url.path)
+    }
+
+
+# ----------------------
+# Static Files Configuration
+# ----------------------
+# Mount static files if the directory exists (frontend build output)
+STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "app", "static")
+if os.path.exists(STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    logger.info(f"Static files mounted from {STATIC_DIR}")
+else:
+    logger.warning(f"Static directory not found: {STATIC_DIR}")
 
 
 @app.get("/checkllm")
@@ -1178,6 +1264,41 @@ def start_background_worker():
 # ----------------------
 # API endpoints
 # ----------------------
+@app.get("/health")
+def health_check():
+    """
+    Health check endpoint for monitoring and load balancers.
+    Returns service status and basic system information.
+    """
+    return {
+        "status": "healthy",
+        "service": "AutoML Orchestrator",
+        "version": "1.0.0",
+        "config": Config.get_summary(),
+        "database": "connected" if os.path.exists(DB) else "not_found",
+        "artifacts_dir": "exists" if os.path.exists(ARTIFACT_DIR) else "not_found"
+    }
+
+
+@app.get("/")
+def root():
+    """
+    Root endpoint - redirects to dashboard.
+    """
+    return {
+        "message": "AutoML Orchestrator API",
+        "version": "1.0.0",
+        "endpoints": {
+            "health": "/health",
+            "dashboard": "/dashboard",
+            "runs": "/runs",
+            "status": "/status/{run_id}",
+            "start_run": "/run",
+            "problem_statement": "/ps"
+        }
+    }
+
+
 @app.post("/run")
 def kick_off_run(req: RunRequest):
     """

@@ -1,7 +1,13 @@
 """
-Simple server starter script
+Simple server starter script for local development
 """
+import os
 import uvicorn
 
 if __name__ == "__main__":
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=False)
+    # Read PORT from environment, default to 8000 for local development
+    port = int(os.getenv("PORT", "8000"))
+    host = os.getenv("HOST", "0.0.0.0")
+    
+    print(f"Starting server on {host}:{port}")
+    uvicorn.run("app.main:app", host=host, port=port, reload=False)

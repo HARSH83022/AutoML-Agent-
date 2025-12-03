@@ -1,53 +1,53 @@
-# fastapi
-# uvicorn[standard]
-# pydantic
-# datasets
-# pandas
-# numpy
-# scikit-learn
-# imbalanced-learn
-# category_encoders
-# flaml
-# xgboost
-# joblib
-# faker
-# matplotlib
-# python-dotenv
-# requests
+# ============================================
+# Web Framework & Server
+# ============================================
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.0.0
+gunicorn>=21.2.0
+python-dotenv>=1.0.0
 
+# ============================================
+# Data Processing & ML
+# ============================================
+pandas>=2.0.0
+numpy>=1.24.0
+scikit-learn>=1.3.0
+imbalanced-learn>=0.11.0
+datasets>=2.14.0
 
+# ============================================
+# AutoML & Model Training
+# ============================================
+flaml>=2.1.0
+xgboost>=2.0.0
+lightgbm>=4.0.0
+catboost>=1.2.0
+optuna>=3.3.0
 
+# ============================================
+# Utilities
+# ============================================
+joblib>=1.3.0
+faker>=19.0.0
+matplotlib>=3.7.0
+requests>=2.31.0
+beautifulsoup4>=4.12.0
 
+# ============================================
+# ML Models & HuggingFace
+# ============================================
+transformers>=4.30.0
+huggingface-hub>=0.16.0
 
-fastapi
-uvicorn[standard]
-pydantic
-datasets
-pandas
-numpy
-scikit-learn
-imbalanced-learn
-flaml
-xgboost
-lightgbm
-catboost
-joblib
-faker
-matplotlib
-python-dotenv
-requests
-beautifulsoup4
-transformers
-huggingface-hub
-
-# LLM Providers
+# ============================================
+# LLM Providers (Optional)
+# ============================================
 openai>=1.0.0
 anthropic>=0.18.0
 google-generativeai>=0.3.0
 
-# Additional ML libraries
-optuna
-kaggle
-
-# Web server for Azure
-gunicorn
+# ============================================
+# Data Sources
+# ============================================
+kaggle>=1.5.0
