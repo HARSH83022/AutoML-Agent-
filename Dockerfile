@@ -33,6 +33,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app/ ./app/
 COPY .env.example ./.env
 
+# Copy entrypoint script
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 # Copy built frontend output to backend static folder
 COPY --from=frontend-builder /app/frontend/dist ./app/static
 
@@ -46,7 +50,6 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD python -c "import requests; requests.get('http://localhost:8000/health')"
 
-# Run application
-# Use shell form to properly expand $PORT environment variable
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+# Run application using entrypoint script
+ENTRYPOINT ["/app/entrypoint.sh"]
 
