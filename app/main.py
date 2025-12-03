@@ -1273,6 +1273,19 @@ def ps_interactive(payload: dict = Body(...)):
         return {"status": "error", "error": str(e)}
 
 
+@app.get("/")
+def root():
+    """Root endpoint - redirects to dashboard"""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/dashboard")
+
+
+@app.get("/health")
+def health_check():
+    """Health check endpoint for Railway"""
+    return {"status": "ok", "service": "AutoML Platform"}
+
+
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard_ui():
     return HTMLResponse(content=DASHBOARD_HTML, status_code=200)
