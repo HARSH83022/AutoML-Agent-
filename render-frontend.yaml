@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: automl-frontend
+    runtime: static
+    branch: Phase-4
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: NODE_VERSION
+        value: 18
