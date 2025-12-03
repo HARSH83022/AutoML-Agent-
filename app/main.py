@@ -1423,23 +1423,3 @@ def ps_interactive(payload: dict = Body(...)):
 def dashboard_ui():
     return HTMLResponse(content=DASHBOARD_HTML, status_code=200)
 
-
-# ----------------------
-# Catch-all route for React Router (SPA)
-# ----------------------
-@app.get("/{full_path:path}")
-def serve_spa(full_path: str):
-    """
-    Catch-all route to serve React SPA for client-side routing.
-    If the path doesn't match an API route, serve index.html.
-    """
-    # Don't intercept API routes
-    if full_path.startswith(("api/", "health", "runs", "status", "run", "ps", "dashboard", "artifacts", "checkllm")):
-        raise HTTPException(status_code=404, detail="Not found")
-    
-    # Serve index.html for all other routes (React Router will handle them)
-    index_path = os.path.join(STATIC_DIR, "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
-    else:
-        raise HTTPException(status_code=404, detail="Frontend not found")
