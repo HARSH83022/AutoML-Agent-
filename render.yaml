@@ -1,29 +1,39 @@
+# services:
+#   - type: web
+#     name: automl-platform
+#     runtime: python
+#     plan: free
+#     buildCommand: |
+#       pip install --upgrade pip
+#       pip install -r requirements.txt
+#       cd frontend && npm install && npm run build && cd ..
+#       mkdir -p app/static
+#       cp -r frontend/dist/* app/static/
+#     startCommand: gunicorn -w 2 -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:$PORT --timeout 600 --max-requests 1000 --max-requests-jitter 50
+#     envVars:
+#       - key: APP_ENV
+#         value: production
+#       - key: LOG_LEVEL
+#         value: info
+#       - key: KAGGLE_USERNAME
+#         value: harsh83022
+#       - key: KAGGLE_KEY
+#         value: 04bd6ce5bcb813d98f2a83457af5c44a
+#       - key: LLM_MODE
+#         value: none
+#       - key: SYNTHETIC_DEFAULT_ROWS
+#         value: 1000
+#       - key: PYTHON_VERSION
+#         value: 3.11.0
+#       - key: NODE_VERSION
+#         value: 18.x
 services:
   - type: web
-    name: automl-platform
-    runtime: python
+    name: automl-agent
+    runtime: rust
     plan: free
-    buildCommand: |
-      pip install --upgrade pip
-      pip install -r requirements.txt
-      cd frontend && npm install && npm run build && cd ..
-      mkdir -p app/static
-      cp -r frontend/dist/* app/static/
-    startCommand: gunicorn -w 2 -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:$PORT --timeout 600 --max-requests 1000 --max-requests-jitter 50
+    buildCommand: "cargo build --release"
+    startCommand: "./target/release/automl_agent"
     envVars:
-      - key: APP_ENV
-        value: production
-      - key: LOG_LEVEL
-        value: info
-      - key: KAGGLE_USERNAME
-        value: harsh83022
-      - key: KAGGLE_KEY
-        value: 04bd6ce5bcb813d98f2a83457af5c44a
-      - key: LLM_MODE
-        value: none
-      - key: SYNTHETIC_DEFAULT_ROWS
-        value: 1000
-      - key: PYTHON_VERSION
-        value: 3.11.0
-      - key: NODE_VERSION
-        value: 18.x
+      - key: RUST_BACKTRACE
+        value: full
